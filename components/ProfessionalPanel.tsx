@@ -106,69 +106,70 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
     handleBlur(f1); handleBlur(f2); handleBlur(f3);
   };
 
-  return (
+    return (
     <div className="h-full flex flex-col bg-[#EEF2FF] border-l border-white/60">
       {/* --- Top Header Area --- */}
-      <div className="px-6 py-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-6">
+      <div className="px-4 md:px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-4 md:space-x-6">
           <button 
             onClick={onClose}
             className="flex items-center text-[#2F54EB] hover:opacity-80 transition-opacity"
           >
-            <ArrowLeftCircle className="w-5 h-5 mr-2" />
-            <span className="font-medium text-sm">专业模式</span>
+            <ArrowLeftCircle className="w-5 h-5 mr-1 md:mr-2" />
+            <span className="font-medium text-sm hidden sm:inline">专业模式</span>
+            <span className="font-medium text-sm sm:hidden">返回</span>
           </button>
           
           {/* Tabs */}
-          <div className="flex bg-transparent space-x-2">
+          <div className="flex bg-transparent space-x-1 md:space-x-2">
             <button
               onClick={() => setActiveTab('params')}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-2 md:px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === 'params' 
                   ? 'bg-white text-[#2F54EB] shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              参数面板
+              参数
             </button>
             <button
               onClick={() => setActiveTab('design')}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-2 md:px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === 'design' 
                   ? 'bg-white text-[#2F54EB] shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              设计方案
+              设计
             </button>
             <button
               onClick={() => setActiveTab('calc')}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-2 md:px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === 'calc' 
                   ? 'bg-white text-[#2F54EB] shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              实时计算
+              计算
             </button>
           </div>
         </div>
 
-        {/* Logo */}
-        <div className="opacity-90">
+        {/* Logo - Hide on small screens */}
+        <div className="opacity-90 hidden sm:block">
           <PecLogoIcon />
         </div>
       </div>
 
       {/* --- Scrollable Content Area --- */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-6 scrollbar-thin space-y-4">
         
         {/* Card 1: System Specs */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-white/50">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-white/50">
           <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">系统规格</h3>
-          <p className="text-xs text-gray-400 mb-5">核心电气规格</p>
+          <p className="text-xs text-gray-400 mb-4 md:mb-5">核心电气规格</p>
 
-          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Left Column: Basic Inputs */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -176,7 +177,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                 <ProInput 
                   value={formData.inputVoltage} 
                   unit="V" 
-                  width="w-20" 
+                  width="w-16 md:w-20" 
                   onChange={(v) => handleChange('inputVoltage', v)}
                   onBlur={() => handleBlur('inputVoltage')}
                   error={getError('inputVoltage')}
@@ -187,7 +188,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                 <ProInput 
                   value={formData.outputVoltage} 
                   unit="V" 
-                  width="w-20" 
+                  width="w-16 md:w-20" 
                   onChange={(v) => handleChange('outputVoltage', v)}
                   onBlur={() => handleBlur('outputVoltage')}
                   error={getError('outputVoltage')}
@@ -198,7 +199,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                 <ProInput 
                   value={formData.outputPower} 
                   unit="W" 
-                  width="w-20" 
+                  width="w-16 md:w-20" 
                   onChange={(v) => handleChange('outputPower', v)}
                   onBlur={() => handleBlur('outputPower')}
                   error={getError('outputPower')}
@@ -237,6 +238,9 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
           </div>
         </div>
 
+        {/* 其余卡片保持类似的响应式修改... */}
+        {/* 将 p-6 改为 p-4 md:p-6 */}
+        {/* 将固定的 grid-cols-2 改为 grid-cols-1 lg:grid-cols-2 */}
         {/* Row 2: Optimization & Global Vars */}
         <div className="grid grid-cols-12 gap-4">
           

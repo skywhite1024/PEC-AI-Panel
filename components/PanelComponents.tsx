@@ -92,7 +92,7 @@ export const ProRangeInput: React.FC<ProRangeInputProps> = ({
   return (
     <div className="flex flex-col py-0.5 space-y-2">
       <span className="text-gray-600 text-sm">{label}</span>
-      <div className="flex items-center text-xs">
+      <div className="flex flex-wrap items-center text-xs gap-2">
         {/* Min */}
         <div className="flex items-center">
           <span className="text-gray-500 mr-2">Min</span>
@@ -107,7 +107,7 @@ export const ProRangeInput: React.FC<ProRangeInputProps> = ({
         </div>
         
         {/* Max */}
-        <div className="flex items-center ml-2">
+        <div className="flex items-center">
           <span className="text-gray-500 mr-2">Max</span>
           <ProInput 
             value={max} 
@@ -120,7 +120,7 @@ export const ProRangeInput: React.FC<ProRangeInputProps> = ({
         </div>
 
         {/* Points */}
-        <div className="flex items-center ml-2">
+        <div className="flex items-center">
           <span className="text-gray-500 mr-2">扫描点数</span>
           <ProInput 
             value={points} 
@@ -129,13 +129,11 @@ export const ProRangeInput: React.FC<ProRangeInputProps> = ({
             onBlur={onBlur}
             error={errors?.points}
           />
-          <span className="text-gray-500 ml-1.5 w-3">V</span>
         </div>
       </div>
     </div>
   );
 };
-
 // --- Charts ---
 
 export const CustomPieChart: React.FC = () => {
