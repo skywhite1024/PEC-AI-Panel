@@ -8,7 +8,7 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
       
-      {/* --- Sidebar (Navigation) --- */}
+      {/* --- 电脑单端模式Sidebar (Navigation) --- */}
       {/* Logic: If Pro Mode, show Mini Sidebar. If Normal Mode, show Full Sidebar. */}
       
       {!isProMode ? (
