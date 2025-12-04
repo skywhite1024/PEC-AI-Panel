@@ -1,4 +1,4 @@
-// App.tsx 开头添加
+// App.tsx
 console.log('=== App.tsx 模块开始加载 ===');
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -7,7 +7,7 @@ import ProfessionalPanel from './components/ProfessionalPanel';
 import { useChat, ChatMessage } from './hooks/useChat';
 import { useChatHistory } from './hooks/useChatHistory';
 import DownloadPanel from './components/DownloadPanel';
-import { DesignParams } from './services/reportGenerator';
+import { useDesignContext } from './hooks/useDesignContext';
 
 console.log('App.tsx: 所有 import 完成');
 
@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [isProMode, setIsProMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [showDownloadPanel, setShowDownloadPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -29,14 +30,24 @@ const App: React.FC = () => {
     getGroupedSessions,
   } = useChatHistory();
 
-  // 使用聊天 hook - 不传入 onMessagesChange，手动控制更新
+  // 使用聊天 hook
   const { messages, isLoading, error, send, clear, retry, setMessages } = useChat();
 
-  // 用于跟踪是否是切换会话触发的消息变化
+  // 用于跟踪会话切换
   const isSessionSwitchRef = useRef(false);
-  
-  // 用于跟踪上一次的 sessionId
   const prevSessionIdRef = useRef<string | null>(null);
+
+  // 添加设计上下文
+  const {
+    extractedDesign,
+    designParams,
+    designResult,
+    designSummary,
+    isExtracting,
+    hasValidDesign,
+    extractFromMessages,
+    clearDesign,
+  } = useDesignContext();
 
   // 当切换会话时加载对应的消息
   useEffect(() => {
@@ -50,42 +61,18 @@ const App: React.FC = () => {
         setMessages([]);
       }
       
-      // 延迟重置标志
       setTimeout(() => {
         isSessionSwitchRef.current = false;
       }, 100);
     }
-  }, [currentSessionId]); // 只依赖 currentSessionId
+  }, [currentSessionId, currentSession, setMessages]);
 
-  // 当消息变化时保存到历史（排除切换会话时的变化）
+  // 当消息变化时保存到历史
   useEffect(() => {
     if (!isSessionSwitchRef.current && currentSessionId && messages.length > 0) {
       updateMessages(messages);
     }
-  }, [messages, currentSessionId]); // 不包含 updateMessages 避免循环
-
-  const [showDownloadPanel, setShowDownloadPanel] = useState(false);
-  const [designParams] = useState<DesignParams>({
-    inputVoltage: '48',
-    outputVoltage: '100',
-    outputPower: '500',
-    vInMin: '40',
-    vInMax: '55',
-    vInPoints: '4',
-    pOutMin: '50',
-    pOutMax: '500',
-    pOutPoints: '5',
-    effWeight: '33.3',
-    costWeight: '33.3',
-    volWeight: '33.3',
-    freq: '50e3',
-    inductance: '20e-6',
-    maxAmbTemp: '50',
-    maxJuncTemp: '125',
-    maxCoreTemp: '100',
-    ripple: '1.0',
-    lRatio: '0.75',
-  });
+  }, [messages, currentSessionId, updateMessages]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -100,12 +87,23 @@ const App: React.FC = () => {
     }
   }, [inputValue]);
 
+  // 当点击"方案下载"时，触发参数提取
+  const handleShowDownload = useCallback(async () => {
+    setShowDownloadPanel(true);
+    setIsMobileMenuOpen(false);
+    
+    if (messages.length > 0 && !hasValidDesign) {
+      await extractFromMessages(messages);
+    }
+  }, [messages, hasValidDesign, extractFromMessages]);
+
   // 开始新对话
   const handleNewChat = useCallback(() => {
     createNewSession();
     clear();
+    clearDesign();
     setShowDownloadPanel(false);
-  }, [createNewSession, clear]);
+  }, [createNewSession, clear, clearDesign]);
 
   // 切换到历史对话
   const handleSwitchSession = useCallback((sessionId: string) => {
@@ -126,7 +124,6 @@ const App: React.FC = () => {
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
     
-    // 如果没有当前会话，先创建一个
     if (!currentSessionId) {
       createNewSession();
     }
@@ -216,7 +213,6 @@ const App: React.FC = () => {
             ))}
           </div>
           
-          {/* Action Bar */}
           {!msg.isStreaming && (
             <div className="flex items-center space-x-3 md:space-x-4 mt-4 pt-2 flex-wrap">
               <Copy 
@@ -243,7 +239,7 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-full bg-white font-sans overflow-hidden relative">
       
-      {/* --- Mobile Menu Overlay --- */}
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
@@ -251,9 +247,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* --- Sidebar (Navigation) --- */}
+      {/* Sidebar */}
       {!isProMode ? (
-        /* --- FULL SIDEBAR (Normal Mode) --- */
         <div className={`
           fixed md:relative z-50 md:z-auto
           w-64 bg-gray-50 border-r border-gray-200 flex flex-col p-4 h-full
@@ -261,7 +256,6 @@ const App: React.FC = () => {
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           md:shrink-0
         `}>
-          {/* Close button for mobile */}
           <button 
             className="md:hidden absolute top-4 right-4 text-gray-500"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -297,10 +291,7 @@ const App: React.FC = () => {
               <LogIn size={18} className="mr-3" /> 信息输入
             </button>
             <button 
-              onClick={() => {
-                setShowDownloadPanel(true);
-                setIsMobileMenuOpen(false);
-              }}
+              onClick={handleShowDownload}
               className={`w-full flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
                 showDownloadPanel 
                   ? 'bg-[#E0E7FF] text-[#5B5FC7] font-medium' 
@@ -362,7 +353,7 @@ const App: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* --- MINI SIDEBAR (Pro Mode) - Hidden on mobile --- */
+        /* Mini Sidebar (Pro Mode) */
         <div className="hidden md:flex w-16 bg-white border-r border-gray-200 flex-col items-center py-6 shrink-0 transition-all duration-300">
           <div className="mb-8">
             <Bot className="w-8 h-8 text-[#5B5FC7]" />
@@ -382,7 +373,11 @@ const App: React.FC = () => {
             <button className="text-[#5B5FC7] bg-[#EEF2FF] p-2 rounded-lg transition-colors" title="信息输入">
               <LogIn size={20} />
             </button>
-            <button className="text-gray-400 hover:text-[#5B5FC7] transition-colors" title="方案下载">
+            <button 
+              onClick={handleShowDownload}
+              className="text-gray-400 hover:text-[#5B5FC7] transition-colors" 
+              title="方案下载"
+            >
               <Download size={20} />
             </button>
             <button className="text-gray-400 hover:text-[#5B5FC7] transition-colors" title="用户提问">
@@ -398,10 +393,9 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* --- Main Chat Area --- */}
+      {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col h-full relative ${isProMode ? 'hidden md:flex' : 'flex'}`}>
         <header className="h-14 border-b border-gray-100 flex items-center justify-between px-4 md:px-6 shrink-0 relative">
-          {/* Mobile Menu Button */}
           <button 
             className="md:hidden text-gray-500 hover:text-gray-700"
             onClick={() => setIsMobileMenuOpen(true)}
@@ -409,17 +403,14 @@ const App: React.FC = () => {
             <Menu size={24} />
           </button>
 
-          {/* Center Title */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <span className="text-sm font-medium text-gray-700 truncate max-w-[150px] md:max-w-none">
               {currentSession?.title || 'PEC-AI 对话'}
             </span>
           </div>
 
-          {/* Empty div for flex spacing on left (desktop) */}
           <div className="hidden md:block"></div>
 
-          {/* Right Side: Professional Mode Button */}
           {!isProMode && (
             <button
               onClick={() => setIsProMode(true)}
@@ -435,7 +426,7 @@ const App: React.FC = () => {
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 bg-white scrollbar-thin">
           
-          {/* 欢迎消息（当没有消息时显示） */}
+          {/* Welcome Message */}
           {messages.length === 0 && !showDownloadPanel && (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <Bot className="w-16 h-16 text-[#5B5FC7] mb-4" />
@@ -465,22 +456,28 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* 渲染消息列表 */}
+          {/* Messages */}
           {messages.map(renderMessage)}
           
+          {/* Download Panel */}
           {showDownloadPanel && (
             <div className="flex items-start space-x-2 md:space-x-3">
               <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
                 <Bot className="text-white w-4 h-4 md:w-5 md:h-5" />
               </div>
               <DownloadPanel 
-                designParams={designParams} 
+                designParams={designParams}
+                designResult={designResult}
+                extractedDesign={extractedDesign}
+                designSummary={designSummary}
+                isExtracting={isExtracting}
+                hasValidDesign={hasValidDesign}
                 onClose={() => setShowDownloadPanel(false)} 
               />
             </div>
           )}
 
-          {/* 加载指示器 */}
+          {/* Loading Indicator */}
           {isLoading && messages[messages.length - 1]?.role === 'user' && (
             <div className="flex items-start space-x-2 md:space-x-3">
               <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
@@ -499,18 +496,13 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* 错误提示 */}
+          {/* Error Message */}
           {error && (
             <div className="flex items-center justify-center p-4">
               <div className="flex items-center space-x-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm">
                 <AlertCircle size={16} />
                 <span>{error}</span>
-                <button 
-                  onClick={retry}
-                  className="ml-2 underline hover:no-underline"
-                >
-                  重试
-                </button>
+                <button onClick={retry} className="ml-2 underline hover:no-underline">重试</button>
               </div>
             </div>
           )}
@@ -559,7 +551,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* --- Right Panel (Professional Mode) --- */}
+      {/* Professional Mode Panel */}
       {isProMode && (
         <div className="
           fixed md:relative inset-0 md:inset-auto
