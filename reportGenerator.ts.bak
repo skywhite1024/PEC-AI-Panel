@@ -1,0 +1,514 @@
+// services/reportGenerator.ts
+console.log('=== reportGenerator.ts 开始加载 ===');
+
+// 设计参数接口
+export interface DesignParams {
+  inputVoltage: string;
+  outputVoltage: string;
+  outputPower: string;
+  vInMin: string;
+  vInMax: string;
+  vInPoints: string;
+  pOutMin: string;
+  pOutMax: string;
+  pOutPoints: string;
+  effWeight: string;
+  costWeight: string;
+  volWeight: string;
+  freq: string;
+  inductance: string;
+  maxAmbTemp: string;
+  maxJuncTemp: string;
+  maxCoreTemp: string;
+  ripple: string;
+  lRatio: string;
+}
+
+// 设计结果（模拟数据）
+export interface DesignResult {
+  efficiency: number;
+  cost: number;
+  volume: number;
+  mosfetModel: string;
+  mosfetManufacturer: string;
+  mosfetVds: string;
+  mosfetRdsOn: string;
+  mosfetQty: number;
+  mosfetUnitPrice: number;
+  diodeModel: string;
+  diodeManufacturer: string;
+  diodeVrrm: string;
+  diodeIf: string;
+  diodeQty: number;
+  diodeUnitPrice: number;
+  inductorCore: string;
+  inductorTurns: number;
+  inductorWireGauge: string;
+  inductorAirGap: string;
+  inductorDcr: string;
+  inductorUnitPrice: number;
+  capInModel: string;
+  capInValue: string;
+  capInVoltage: string;
+  capInQty: number;
+  capInUnitPrice: number;
+  capOutModel: string;
+  capOutValue: string;
+  capOutVoltage: string;
+  capOutQty: number;
+  capOutUnitPrice: number;
+  heatsinkModel: string;
+  heatsinkRth: string;
+  heatsinkUnitPrice: number;
+  mosfetCondLoss: number;
+  mosfetSwLoss: number;
+  diodeLoss: number;
+  inductorCoreLoss: number;
+  inductorCopperLoss: number;
+  capLoss: number;
+  totalLoss: number;
+  mosfetTj: number;
+  diodeTj: number;
+  inductorTemp: number;
+}
+
+// 根据参数生成模拟设计结果
+export function generateDesignResult(params: DesignParams): DesignResult {
+  console.log('generateDesignResult 被调用');
+  const pOut = parseFloat(params.outputPower) || 500;
+  const isPowerHigh = pOut > 300;
+  
+  return {
+    efficiency: 98.2 + Math.random() * 0.5,
+    cost: Math.round(25 + pOut * 0.02 + Math.random() * 10),
+    volume: parseFloat((0.1 + pOut * 0.0001).toFixed(3)),
+    mosfetModel: isPowerHigh ? 'IPP65R045C7' : 'IPP60R099C6',
+    mosfetManufacturer: 'Infineon',
+    mosfetVds: isPowerHigh ? '650V' : '600V',
+    mosfetRdsOn: isPowerHigh ? '45mΩ' : '99mΩ',
+    mosfetQty: isPowerHigh ? 2 : 1,
+    mosfetUnitPrice: isPowerHigh ? 8.5 : 4.2,
+    diodeModel: 'C3D10065A',
+    diodeManufacturer: 'Wolfspeed',
+    diodeVrrm: '650V',
+    diodeIf: '10A',
+    diodeQty: 1,
+    diodeUnitPrice: 5.8,
+    inductorCore: 'PQ35/35-3C95',
+    inductorTurns: Math.round(15 + pOut * 0.01),
+    inductorWireGauge: 'AWG14 x 3',
+    inductorAirGap: '1.2mm',
+    inductorDcr: '15mΩ',
+    inductorUnitPrice: 6.5,
+    capInModel: 'EKY-500ELL471MK20S',
+    capInValue: '470μF',
+    capInVoltage: '100V',
+    capInQty: 2,
+    capInUnitPrice: 2.1,
+    capOutModel: 'EKY-160ELL102MK20S',
+    capOutValue: '1000μF',
+    capOutVoltage: '160V',
+    capOutQty: 2,
+    capOutUnitPrice: 3.2,
+    heatsinkModel: 'SK104-50.8mm',
+    heatsinkRth: '3.5°C/W',
+    heatsinkUnitPrice: 4.5,
+    mosfetCondLoss: parseFloat((pOut * 0.005).toFixed(2)),
+    mosfetSwLoss: parseFloat((pOut * 0.003).toFixed(2)),
+    diodeLoss: parseFloat((pOut * 0.004).toFixed(2)),
+    inductorCoreLoss: parseFloat((pOut * 0.002).toFixed(2)),
+    inductorCopperLoss: parseFloat((pOut * 0.003).toFixed(2)),
+    capLoss: parseFloat((pOut * 0.001).toFixed(2)),
+    totalLoss: parseFloat((pOut * 0.018).toFixed(2)),
+    mosfetTj: Math.round(85 + Math.random() * 20),
+    diodeTj: Math.round(80 + Math.random() * 15),
+    inductorTemp: Math.round(70 + Math.random() * 15),
+  };
+}
+
+// 生成 BOM CSV
+export function generateBOMCSV(params: DesignParams, result: DesignResult): string {
+  console.log('generateBOMCSV 被调用');
+  const headers = ['序号', '类别', '型号', '制造商', '关键参数', '数量', '单价(¥)', '小计(¥)'];
+  const rows = [
+    ['1', 'MOSFET', result.mosfetModel, result.mosfetManufacturer, `Vds=${result.mosfetVds}, Rds(on)=${result.mosfetRdsOn}`, result.mosfetQty.toString(), result.mosfetUnitPrice.toFixed(2), (result.mosfetQty * result.mosfetUnitPrice).toFixed(2)],
+    ['2', '二极管', result.diodeModel, result.diodeManufacturer, `Vrrm=${result.diodeVrrm}, If=${result.diodeIf}`, result.diodeQty.toString(), result.diodeUnitPrice.toFixed(2), (result.diodeQty * result.diodeUnitPrice).toFixed(2)],
+    ['3', '主电感', result.inductorCore, 'Custom', `L=${params.inductance}H, DCR=${result.inductorDcr}`, '1', result.inductorUnitPrice.toFixed(2), result.inductorUnitPrice.toFixed(2)],
+    ['4', '输入电容', result.capInModel, 'Nippon Chemi-Con', `${result.capInValue}/${result.capInVoltage}`, result.capInQty.toString(), result.capInUnitPrice.toFixed(2), (result.capInQty * result.capInUnitPrice).toFixed(2)],
+    ['5', '输出电容', result.capOutModel, 'Nippon Chemi-Con', `${result.capOutValue}/${result.capOutVoltage}`, result.capOutQty.toString(), result.capOutUnitPrice.toFixed(2), (result.capOutQty * result.capOutUnitPrice).toFixed(2)],
+    ['6', '散热器', result.heatsinkModel, 'Fischer', `Rth=${result.heatsinkRth}`, '1', result.heatsinkUnitPrice.toFixed(2), result.heatsinkUnitPrice.toFixed(2)],
+  ];
+  
+  const totalCost = rows.reduce((sum, row) => sum + parseFloat(row[7]), 0);
+  rows.push(['', '', '', '', '', '', '总计', totalCost.toFixed(2)]);
+  
+  return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+}
+
+// 懒加载 jsPDF - 使用更可靠的方式
+let jsPDFModule: any = null;
+let autoTableModule: any = null;
+let loadingPromise: Promise<any> | null = null;
+
+async function loadPDFModules(): Promise<{ jsPDF: any; autoTable: any }> {
+  // 如果已经加载过，直接返回
+  if (jsPDFModule && autoTableModule) {
+    return { jsPDF: jsPDFModule, autoTable: autoTableModule };
+  }
+  
+  // 如果正在加载中，等待加载完成
+  if (loadingPromise) {
+    return loadingPromise;
+  }
+  
+  // 开始加载
+  loadingPromise = (async () => {
+    try {
+      console.log('开始加载 jsPDF 模块...');
+      
+      // 使用 Promise.all 并行加载
+      const [jspdfModule, autoTableMod] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable')
+      ]);
+      
+      jsPDFModule = jspdfModule.default || jspdfModule.jsPDF || jspdfModule;
+      autoTableModule = autoTableMod.default || autoTableMod;
+      
+      console.log('jsPDF 加载成功:', typeof jsPDFModule);
+      console.log('autoTable 加载成功:', typeof autoTableModule);
+      
+      return { jsPDF: jsPDFModule, autoTable: autoTableModule };
+    } catch (error) {
+      console.error('加载 PDF 模块失败:', error);
+      loadingPromise = null; // 重置以便重试
+      throw error;
+    }
+  })();
+  
+  return loadingPromise;
+}
+
+// 简化的 PDF 生成函数 - 不使用 autoTable
+function createSimplePDF(title: string, content: string[][]): any {
+  // 创建一个简单的文本 PDF
+  const { jsPDF } = loadPDFModulesSync();
+  if (!jsPDF) {
+    throw new Error('jsPDF 未加载');
+  }
+  
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text(title, 20, 20);
+  
+  let y = 40;
+  doc.setFontSize(10);
+  content.forEach(row => {
+    doc.text(row.join(' | '), 20, y);
+    y += 7;
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  });
+  
+  return doc;
+}
+
+// 同步获取已加载的模块
+function loadPDFModulesSync(): { jsPDF: any; autoTable: any } {
+  return { jsPDF: jsPDFModule, autoTable: autoTableModule };
+}
+
+// 生成设计报告 PDF
+export async function generateDesignReportPDF(params: DesignParams, result: DesignResult): Promise<any> {
+  console.log('generateDesignReportPDF 被调用');
+  
+  try {
+    const { jsPDF, autoTable } = await loadPDFModules();
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+    
+    // 标题
+    doc.setFontSize(20);
+    doc.setTextColor(91, 95, 199);
+    doc.text('PEC-AI Design Report', pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 10;
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${new Date().toLocaleString('zh-CN')}`, pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 10;
+    doc.setDrawColor(91, 95, 199);
+    doc.setLineWidth(0.5);
+    doc.line(20, yPos, pageWidth - 20, yPos);
+    
+    // 核心性能
+    yPos += 15;
+    doc.setFontSize(14);
+    doc.setTextColor(47, 84, 235);
+    doc.text('Core Performance', 20, yPos);
+    
+    yPos += 10;
+    doc.setFontSize(11);
+    doc.setTextColor(60);
+    doc.text(`Efficiency: ${result.efficiency.toFixed(2)}%`, 25, yPos);
+    doc.text(`Cost: $${result.cost}`, 80, yPos);
+    doc.text(`Volume: ${result.volume} dm3`, 130, yPos);
+    
+    // 系统规格
+    yPos += 20;
+    doc.setFontSize(14);
+    doc.setTextColor(47, 84, 235);
+    doc.text('1. System Specifications', 20, yPos);
+    
+    yPos += 8;
+    
+    // 使用 autoTable
+    if (autoTable) {
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Parameter', 'Value', 'Unit']],
+        body: [
+          ['Input Voltage', params.inputVoltage, 'V'],
+          ['Output Voltage', params.outputVoltage, 'V'],
+          ['Output Power', params.outputPower, 'W'],
+          ['Switching Frequency', params.freq, 'Hz'],
+          ['Inductance', params.inductance, 'H'],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [91, 95, 199] },
+        margin: { left: 25 },
+        tableWidth: 100,
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    } else {
+      // 降级方案：手动绘制表格
+      yPos += 5;
+      doc.setFontSize(10);
+      doc.text(`Input Voltage: ${params.inputVoltage} V`, 25, yPos);
+      yPos += 7;
+      doc.text(`Output Voltage: ${params.outputVoltage} V`, 25, yPos);
+      yPos += 7;
+      doc.text(`Output Power: ${params.outputPower} W`, 25, yPos);
+      yPos += 7;
+      doc.text(`Frequency: ${params.freq} Hz`, 25, yPos);
+      yPos += 7;
+      doc.text(`Inductance: ${params.inductance} H`, 25, yPos);
+      yPos += 15;
+    }
+    
+    // 优化权重
+    doc.setFontSize(14);
+    doc.setTextColor(47, 84, 235);
+    doc.text('2. Optimization Weights', 20, yPos);
+    
+    yPos += 8;
+    
+    if (autoTable) {
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Objective', 'Weight (%)']],
+        body: [
+          ['Efficiency', params.effWeight],
+          ['Cost', params.costWeight],
+          ['Volume', params.volWeight],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [91, 95, 199] },
+        margin: { left: 25 },
+        tableWidth: 80,
+      });
+    } else {
+      yPos += 5;
+      doc.setFontSize(10);
+      doc.text(`Efficiency Weight: ${params.effWeight}%`, 25, yPos);
+      yPos += 7;
+      doc.text(`Cost Weight: ${params.costWeight}%`, 25, yPos);
+      yPos += 7;
+      doc.text(`Volume Weight: ${params.volWeight}%`, 25, yPos);
+    }
+    
+    console.log('PDF 生成完成');
+    return doc;
+  } catch (error) {
+    console.error('生成 PDF 失败:', error);
+    throw error;
+  }
+}
+
+// 生成半导体选型报告
+export async function generateSemiconductorReportPDF(params: DesignParams, result: DesignResult): Promise<any> {
+  console.log('generateSemiconductorReportPDF 被调用');
+  
+  try {
+    const { jsPDF, autoTable } = await loadPDFModules();
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+    
+    doc.setFontSize(18);
+    doc.setTextColor(91, 95, 199);
+    doc.text('Semiconductor Selection Report', pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 15;
+    doc.setFontSize(14);
+    doc.setTextColor(47, 84, 235);
+    doc.text('1. MOSFET Selection', 20, yPos);
+    
+    yPos += 8;
+    
+    if (autoTable) {
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Parameter', 'Value']],
+        body: [
+          ['Model', result.mosfetModel],
+          ['Manufacturer', result.mosfetManufacturer],
+          ['Vds', result.mosfetVds],
+          ['Rds(on)', result.mosfetRdsOn],
+          ['Quantity', result.mosfetQty.toString()],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [91, 95, 199] },
+      });
+    }
+    
+    console.log('半导体报告 PDF 生成完成');
+    return doc;
+  } catch (error) {
+    console.error('生成半导体报告失败:', error);
+    throw error;
+  }
+}
+
+// 生成磁性元件设计报告
+export async function generateInductorReportPDF(params: DesignParams, result: DesignResult): Promise<any> {
+  console.log('generateInductorReportPDF 被调用');
+  
+  try {
+    const { jsPDF, autoTable } = await loadPDFModules();
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+    
+    doc.setFontSize(18);
+    doc.setTextColor(91, 95, 199);
+    doc.text('Inductor Design Report', pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 15;
+    doc.setFontSize(14);
+    doc.setTextColor(47, 84, 235);
+    doc.text('1. Inductor Specifications', 20, yPos);
+    
+    yPos += 8;
+    
+    if (autoTable) {
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Parameter', 'Value']],
+        body: [
+          ['Target Inductance', `${params.inductance} H`],
+          ['Core', result.inductorCore],
+          ['Turns', result.inductorTurns.toString()],
+          ['Wire Gauge', result.inductorWireGauge],
+          ['Air Gap', result.inductorAirGap],
+          ['DCR', result.inductorDcr],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [91, 95, 199] },
+      });
+    }
+    
+    console.log('电感报告 PDF 生成完成');
+    return doc;
+  } catch (error) {
+    console.error('生成电感报告失败:', error);
+    throw error;
+  }
+}
+
+// 生成电容选型报告
+export async function generateCapacitorReportPDF(params: DesignParams, result: DesignResult): Promise<any> {
+  console.log('generateCapacitorReportPDF 被调用');
+  
+  try {
+    const { jsPDF, autoTable } = await loadPDFModules();
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+    
+    doc.setFontSize(18);
+    doc.setTextColor(91, 95, 199);
+    doc.text('Capacitor Selection Report', pageWidth / 2, yPos, { align: 'center' });
+    
+    yPos += 15;
+    doc.setFontSize(14);
+    doc.setTextColor(47, 84, 235);
+    doc.text('1. Input Capacitor', 20, yPos);
+    
+    yPos += 8;
+    
+    if (autoTable) {
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Parameter', 'Value']],
+        body: [
+          ['Model', result.capInModel],
+          ['Capacitance', result.capInValue],
+          ['Voltage Rating', result.capInVoltage],
+          ['Quantity', result.capInQty.toString()],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [91, 95, 199] },
+      });
+    }
+    
+    console.log('电容报告 PDF 生成完成');
+    return doc;
+  } catch (error) {
+    console.error('生成电容报告失败:', error);
+    throw error;
+  }
+}
+
+// 下载文件辅助函数
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 下载 PDF
+export function downloadPDF(doc: any, filename: string) {
+  console.log('downloadPDF 被调用:', filename);
+  try {
+    doc.save(filename);
+    console.log('PDF 下载成功');
+  } catch (error) {
+    console.error('PDF 下载失败:', error);
+    throw error;
+  }
+}
+
+// 下载 CSV
+export function downloadCSV(content: string, filename: string) {
+  console.log('downloadCSV 被调用:', filename);
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + content], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, filename);
+}
+
+console.log('=== reportGenerator.ts 加载完成 ===');

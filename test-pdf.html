@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>jsPDF 测试</title>
+</head>
+
+<body>
+    <h1>jsPDF 测试页面</h1>
+    <button id="testBtn">测试 jsPDF</button>
+    <div id="result"></div>
+
+    <script type="module">
+        const btn = document.getElementById('testBtn');
+        const result = document.getElementById('result');
+
+        btn.addEventListener('click', async () => {
+            result.textContent = '正在加载 jsPDF...';
+            try {
+                console.log('开始导入 jspdf...');
+                const jspdfModule = await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm');
+                console.log('jspdf 模块:', jspdfModule);
+
+                const jsPDF = jspdfModule.default || jspdfModule.jsPDF;
+                console.log('jsPDF 构造函数:', jsPDF);
+
+                const doc = new jsPDF();
+                doc.text('Hello World!', 10, 10);
+                doc.save('test.pdf');
+
+                result.textContent = 'PDF 下载成功！';
+            } catch (error) {
+                console.error('错误:', error);
+                result.textContent = '错误: ' + error.message;
+            }
+        });
+    </script>
+</body>
+
+</html>
