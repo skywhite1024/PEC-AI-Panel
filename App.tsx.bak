@@ -1,71 +1,32 @@
 // App.tsx 开头添加
 console.log('=== App.tsx 模块开始加载 ===');
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, Paperclip, Mic, ArrowUp, Settings2, RotateCcw, ThumbsUp, ThumbsDown, Share2, Copy, FileEdit, CirclePlus, ChevronDown, LogIn, Download, MessageSquare, ArrowRightCircle, History, Menu, X, AlertCircle, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, Paperclip, Mic, ArrowUp, Settings2, RotateCcw, ThumbsUp, ThumbsDown, Share2, Copy, FileEdit, CirclePlus, ChevronDown, LogIn, Download, MessageSquare, ArrowRightCircle, History, Menu, X, AlertCircle } from 'lucide-react';
 import ProfessionalPanel from './components/ProfessionalPanel';
 import { useChat, ChatMessage } from './hooks/useChat';
-import { useChatHistory } from './hooks/useChatHistory';
+
+// App.tsx - 在文件顶部添加导入
 import DownloadPanel from './components/DownloadPanel';
 import { DesignParams } from './services/reportGenerator';
 
+// 在所有 import 之后添加
 console.log('App.tsx: 所有 import 完成');
 
 const App: React.FC = () => {
+
+  console.log('=== App 组件开始渲染 ===');
+
   const [isProMode, setIsProMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 使用对话历史 hook
-  const {
-    currentSession,
-    currentSessionId,
-    createNewSession,
-    switchSession,
-    updateMessages,
-    deleteSession,
-    getGroupedSessions,
-  } = useChatHistory();
-
-  // 使用聊天 hook - 不传入 onMessagesChange，手动控制更新
-  const { messages, isLoading, error, send, clear, retry, setMessages } = useChat();
-
-  // 用于跟踪是否是切换会话触发的消息变化
-  const isSessionSwitchRef = useRef(false);
-  
-  // 用于跟踪上一次的 sessionId
-  const prevSessionIdRef = useRef<string | null>(null);
-
-  // 当切换会话时加载对应的消息
-  useEffect(() => {
-    if (currentSessionId !== prevSessionIdRef.current) {
-      prevSessionIdRef.current = currentSessionId;
-      isSessionSwitchRef.current = true;
-      
-      if (currentSession) {
-        setMessages(currentSession.messages);
-      } else {
-        setMessages([]);
-      }
-      
-      // 延迟重置标志
-      setTimeout(() => {
-        isSessionSwitchRef.current = false;
-      }, 100);
-    }
-  }, [currentSessionId]); // 只依赖 currentSessionId
-
-  // 当消息变化时保存到历史（排除切换会话时的变化）
-  useEffect(() => {
-    if (!isSessionSwitchRef.current && currentSessionId && messages.length > 0) {
-      updateMessages(messages);
-    }
-  }, [messages, currentSessionId]); // 不包含 updateMessages 避免循环
+  const { messages, isLoading, error, send, clear, retry } = useChat();
 
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
-  const [designParams] = useState<DesignParams>({
+  const [designParams, setDesignParams] = useState<DesignParams>({
     inputVoltage: '48',
     outputVoltage: '100',
     outputPower: '500',
@@ -100,37 +61,9 @@ const App: React.FC = () => {
     }
   }, [inputValue]);
 
-  // 开始新对话
-  const handleNewChat = useCallback(() => {
-    createNewSession();
-    clear();
-    setShowDownloadPanel(false);
-  }, [createNewSession, clear]);
-
-  // 切换到历史对话
-  const handleSwitchSession = useCallback((sessionId: string) => {
-    switchSession(sessionId);
-    setShowDownloadPanel(false);
-    setIsMobileMenuOpen(false);
-  }, [switchSession]);
-
-  // 删除对话
-  const handleDeleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm('确定要删除这个对话吗？')) {
-      deleteSession(sessionId);
-    }
-  }, [deleteSession]);
-
   // 发送消息
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
-    
-    // 如果没有当前会话，先创建一个
-    if (!currentSessionId) {
-      createNewSession();
-    }
-    
     const message = inputValue;
     setInputValue('');
     await send(message);
@@ -148,31 +81,6 @@ const App: React.FC = () => {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
-
-  // 获取分组的历史记录
-  const { within7Days, within30Days, older } = getGroupedSessions();
-
-  // 渲染历史记录项
-  const renderSessionItem = (session: { id: string; title: string }) => (
-    <div
-      key={session.id}
-      className={`group flex items-center justify-between py-2 px-2 rounded-lg cursor-pointer transition-colors ${
-        session.id === currentSessionId
-          ? 'bg-[#E0E7FF] text-[#5B5FC7]'
-          : 'hover:bg-gray-100 text-gray-600'
-      }`}
-      onClick={() => handleSwitchSession(session.id)}
-    >
-      <p className="truncate flex-1 text-sm">{session.title}</p>
-      <button
-        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
-        onClick={(e) => handleDeleteSession(session.id, e)}
-        title="删除对话"
-      >
-        <Trash2 size={14} />
-      </button>
-    </div>
-  );
 
   // 渲染单条消息
   const renderMessage = (msg: ChatMessage) => {
@@ -285,13 +193,13 @@ const App: React.FC = () => {
           </button>
 
           <button 
-            onClick={handleNewChat}
+            onClick={clear}
             className="flex items-center justify-center w-full py-2.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 mb-6 shadow-sm font-medium text-sm transition-colors"
           >
             <CirclePlus size={18} className="mr-2 text-gray-500" /> 开启新对话
           </button>
 
-          {/* Menu Items */}
+                    {/* Menu Items */}
           <div className="space-y-2 mb-8">
             <button className="w-full flex items-center px-4 py-2 bg-[#E0E7FF] text-[#5B5FC7] rounded-lg text-sm font-medium transition-colors">
               <LogIn size={18} className="mr-3" /> 信息输入
@@ -316,36 +224,18 @@ const App: React.FC = () => {
 
           {/* History */}
           <div className="flex-1 overflow-y-auto scrollbar-thin">
-            {within7Days.length > 0 && (
-              <>
-                <p className="text-xs text-gray-400 mb-3 font-medium">7天内</p>
-                <div className="space-y-1 mb-6">
-                  {within7Days.map(renderSessionItem)}
-                </div>
-              </>
-            )}
+            <p className="text-xs text-gray-400 mb-3 font-medium">7天内</p>
+            <div className="space-y-3 text-sm text-gray-600 mb-6">
+              <p className="truncate hover:text-[#5B5FC7] cursor-pointer transition-colors">10kW光伏并网逆变器设计</p>
+              <p className="truncate hover:text-[#5B5FC7] cursor-pointer transition-colors">3kW氢燃料电池DC/DC变换器...</p>
+              <p className="truncate hover:text-[#5B5FC7] cursor-pointer transition-colors">150kW电动汽车快速充电模块...</p>
+              <p className="truncate hover:text-[#5B5FC7] cursor-pointer transition-colors">1kW微型燃气轮机发电系统控...</p>
+            </div>
             
-            {within30Days.length > 0 && (
-              <>
-                <p className="text-xs text-gray-400 mb-3 font-medium">30天内</p>
-                <div className="space-y-1 mb-6">
-                  {within30Days.map(renderSessionItem)}
-                </div>
-              </>
-            )}
-
-            {older.length > 0 && (
-              <>
-                <p className="text-xs text-gray-400 mb-3 font-medium">更早</p>
-                <div className="space-y-1">
-                  {older.map(renderSessionItem)}
-                </div>
-              </>
-            )}
-
-            {within7Days.length === 0 && within30Days.length === 0 && older.length === 0 && (
-              <p className="text-xs text-gray-400 text-center py-4">暂无对话历史</p>
-            )}
+            <p className="text-xs text-gray-400 mb-3 font-medium">30天内</p>
+            <div className="space-y-3 text-sm text-gray-600">
+              <p className="truncate hover:text-[#5B5FC7] cursor-pointer transition-colors">1MW工商业储能PCS（双向变...</p>
+            </div>
           </div>
 
           {/* User Footer */}
@@ -373,7 +263,7 @@ const App: React.FC = () => {
               <History size={20} />
             </button>
             <button 
-              onClick={handleNewChat}
+              onClick={clear}
               className="text-gray-400 hover:text-[#5B5FC7] transition-colors" 
               title="新对话"
             >
@@ -412,7 +302,7 @@ const App: React.FC = () => {
           {/* Center Title */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <span className="text-sm font-medium text-gray-700 truncate max-w-[150px] md:max-w-none">
-              {currentSession?.title || 'PEC-AI 对话'}
+              {messages.length > 0 ? 'PEC-AI 对话' : '5kW储能变换器设计'}
             </span>
           </div>
 
@@ -436,7 +326,7 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 bg-white scrollbar-thin">
           
           {/* 欢迎消息（当没有消息时显示） */}
-          {messages.length === 0 && !showDownloadPanel && (
+          {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <Bot className="w-16 h-16 text-[#5B5FC7] mb-4" />
               <h2 className="text-xl font-medium text-gray-800 mb-2">欢迎使用 PEC-AI</h2>
@@ -467,7 +357,6 @@ const App: React.FC = () => {
 
           {/* 渲染消息列表 */}
           {messages.map(renderMessage)}
-          
           {showDownloadPanel && (
             <div className="flex items-start space-x-2 md:space-x-3">
               <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">

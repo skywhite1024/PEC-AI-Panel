@@ -1,6 +1,6 @@
 // hooks/useChat.ts
 import { useState, useCallback } from 'react';
-import { sendMessage, sendMessageStream, Message } from '../services/api';
+import { sendMessage, Message } from '../services/api';
 
 export interface ChatMessage {
   id: string;
@@ -61,69 +61,6 @@ export function useChat() {
     }
   }, [messages, isLoading]);
 
-  // 流式发送（打字机效果）
-  const sendStreaming = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return;
-
-    setError(null);
-    
-    // 添加用户消息
-    const userMessage: ChatMessage = {
-      id: generateId(),
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date(),
-    };
-    
-    const assistantId = generateId();
-    
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-
-    // 添加空的 AI 消息占位
-    setMessages(prev => [...prev, {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      isStreaming: true,
-    }]);
-
-    try {
-      // 构建历史消息
-      const history: Message[] = messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-      history.push({ role: 'user', content: content.trim() });
-
-      // 流式调用 API
-      await sendMessageStream(
-        history,
-        (chunk) => {
-          setMessages(prev => prev.map(m => 
-            m.id === assistantId 
-              ? { ...m, content: m.content + chunk }
-              : m
-          ));
-        },
-        () => {
-          setMessages(prev => prev.map(m => 
-            m.id === assistantId 
-              ? { ...m, isStreaming: false }
-              : m
-          ));
-        }
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '发送消息失败');
-      // 移除失败的 AI 消息
-      setMessages(prev => prev.filter(m => m.id !== assistantId));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [messages, isLoading]);
-
   // 清空对话
   const clear = useCallback(() => {
     setMessages([]);
@@ -152,8 +89,8 @@ export function useChat() {
     isLoading,
     error,
     send,
-    sendStreaming,
     clear,
     retry,
+    setMessages,
   };
 }
