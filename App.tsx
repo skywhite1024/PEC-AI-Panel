@@ -8,6 +8,7 @@ import { useChat, ChatMessage } from './hooks/useChat';
 import { useChatHistory } from './hooks/useChatHistory';
 import DownloadPanel from './components/DownloadPanel';
 import { useDesignContext } from './hooks/useDesignContext';
+import ThinkingBlock from './components/ThinkingBlock';
 
 console.log('App.tsx: 所有 import 完成');
 
@@ -30,8 +31,19 @@ const App: React.FC = () => {
     getGroupedSessions,
   } = useChatHistory();
 
-  // 使用聊天 hook
-  const { messages, isLoading, error, send, clear, retry, setMessages } = useChat();
+  // 使用聊天 hook - 只声明一次！
+  const { 
+    messages, 
+    isLoading, 
+    error, 
+    designState, 
+    send, 
+    clear, 
+    retry, 
+    setMessages, 
+    resetDesignState,
+    clearShowDownload
+  } = useChat();
 
   // 用于跟踪会话切换
   const isSessionSwitchRef = useRef(false);
@@ -48,6 +60,62 @@ const App: React.FC = () => {
     extractFromMessages,
     clearDesign,
   } = useDesignContext();
+
+  // 设计确认横幅组件
+  const DesignConfirmBanner = () => {
+    if (!designState.isConfirmed && !designState.isAskingForGeneration) return null;
+    
+    return (
+      <div className="bg-gradient-to-r from-[#E0E7FF] to-[#F0F5FF] rounded-xl p-4 mx-4 mb-4 shadow-sm border border-[#5B5FC7]/20">
+        <div className="flex items-start space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
+            <Bot className="text-white w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm text-gray-700 mb-3 font-medium">
+              {designState.isAskingForGeneration 
+                ? '设计参数已确认，可以生成方案了！'
+                : '太好了！设计参数已确认。现在您可以：'}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={async () => {
+                  resetDesignState();
+                  await extractFromMessages(messages);
+                  setShowDownloadPanel(true);
+                }}
+                className="flex items-center px-4 py-2 bg-[#5B5FC7] text-white rounded-lg text-sm font-medium hover:bg-[#4a4ea3] transition-colors shadow-sm"
+              >
+                <Download size={16} className="mr-2" />
+                生成并下载设计方案
+              </button>
+              <button
+                onClick={() => {
+                  resetDesignState();
+                  send('我想继续调整一些参数');
+                }}
+                className="flex items-center px-4 py-2 border border-[#5B5FC7] text-[#5B5FC7] rounded-lg text-sm font-medium hover:bg-[#F0F5FF] transition-colors"
+              >
+                <MessageSquare size={16} className="mr-2" />
+                继续优化参数
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 监听是否应该显示下载面板
+  useEffect(() => {
+    if (designState.shouldShowDownload) {
+      (async () => {
+        await extractFromMessages(messages);
+        setShowDownloadPanel(true);
+        clearShowDownload();
+      })();
+    }
+  }, [designState.shouldShowDownload, messages, extractFromMessages, clearShowDownload]);
 
   // 当切换会话时加载对应的消息
   useEffect(() => {
@@ -102,15 +170,18 @@ const App: React.FC = () => {
     createNewSession();
     clear();
     clearDesign();
+    resetDesignState();
     setShowDownloadPanel(false);
-  }, [createNewSession, clear, clearDesign]);
+  }, [createNewSession, clear, clearDesign, resetDesignState]);
 
   // 切换到历史对话
   const handleSwitchSession = useCallback((sessionId: string) => {
     switchSession(sessionId);
     setShowDownloadPanel(false);
     setIsMobileMenuOpen(false);
-  }, [switchSession]);
+    resetDesignState();
+    clearDesign();
+  }, [switchSession, resetDesignState, clearDesign]);
 
   // 删除对话
   const handleDeleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
@@ -196,6 +267,7 @@ const App: React.FC = () => {
       );
     }
 
+    // Assistant message
     return (
       <div key={msg.id} className="flex items-start space-x-2 md:space-x-3">
         <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
@@ -203,17 +275,33 @@ const App: React.FC = () => {
         </div>
         <div className="bg-[#F0F5FF] rounded-2xl p-4 md:p-5 max-w-[85%] md:max-w-[85%] shadow-sm">
           <div className="font-medium text-sm text-gray-800 mb-2">[PEC-AI]</div>
+          
+          {/* 思考内容展示 */}
+          {(msg.thinking || msg.isThinking) && (
+            <ThinkingBlock 
+              thinking={msg.thinking || ''}
+              isThinking={msg.isThinking}
+              duration={msg.thinkingDuration}
+              defaultExpanded={false}
+            />
+          )}
+          
+          {/* 正式回复内容 */}
           <div className="text-sm text-gray-700 space-y-2 leading-relaxed whitespace-pre-wrap">
-            {msg.content || (msg.isStreaming && (
-              <span className="inline-flex space-x-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></span>
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+            {msg.content || (msg.isStreaming && !msg.content && (
+              <span className="inline-flex items-center space-x-1 text-gray-500">
+                <span>正在生成回复</span>
+                <span className="inline-flex space-x-1">
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                </span>
               </span>
             ))}
           </div>
           
-          {!msg.isStreaming && (
+          {/* Action Bar - 只在非流式状态下显示 */}
+          {!msg.isStreaming && msg.content && (
             <div className="flex items-center space-x-3 md:space-x-4 mt-4 pt-2 flex-wrap">
               <Copy 
                 size={16} 
@@ -509,6 +597,9 @@ const App: React.FC = () => {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Design Confirm Banner */}
+        <DesignConfirmBanner />
 
         {/* Input Area */}
         <div className="p-3 md:p-4 shrink-0">

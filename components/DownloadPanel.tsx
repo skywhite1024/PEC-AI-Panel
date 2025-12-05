@@ -223,11 +223,20 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-500">拓扑:</span>
-              <span className="font-medium">{extractedDesign.topology}</span>
+              <span className="font-medium">
+                {extractedDesign.topology === 'boost' ? '升压 (Boost)' :
+                extractedDesign.topology === 'buck' ? '降压 (Buck)' :
+                extractedDesign.topology === 'buck-boost' ? '升降压 (Buck-Boost)' :
+                extractedDesign.topology}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">输入电压:</span>
-              <span className="font-medium">{extractedDesign.inputVoltage}V</span>
+              <span className="font-medium">
+                {extractedDesign.inputVoltageMin && extractedDesign.inputVoltageMax 
+                  ? `${extractedDesign.inputVoltageMin}V~${extractedDesign.inputVoltageMax}V`
+                  : `${extractedDesign.inputVoltage}V`}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">输出电压:</span>
@@ -241,13 +250,13 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
               <span className="text-gray-500">优化策略:</span>
               <span className="font-medium">
                 {extractedDesign.priority === 'efficiency' ? '效率优先' :
-                 extractedDesign.priority === 'cost' ? '成本优先' :
-                 extractedDesign.priority === 'volume' ? '体积优先' : '均衡设计'}
+                extractedDesign.priority === 'cost' ? '成本优先' :
+                extractedDesign.priority === 'volume' ? '体积优先' : '均衡设计'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">置信度:</span>
-              <span className={`font-medium ${extractedDesign.confidence > 0.8 ? 'text-green-600' : 'text-orange-500'}`}>
+              <span className={`font-medium ${extractedDesign.confidence > 0.8 ? 'text-green-600' : extractedDesign.confidence > 0.5 ? 'text-yellow-600' : 'text-orange-500'}`}>
                 {(extractedDesign.confidence * 100).toFixed(0)}%
               </span>
             </div>
