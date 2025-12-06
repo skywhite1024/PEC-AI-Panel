@@ -9,6 +9,8 @@ import { useChatHistory } from './hooks/useChatHistory';
 import DownloadPanel from './components/DownloadPanel';
 import { useDesignContext } from './hooks/useDesignContext';
 import ThinkingBlock from './components/ThinkingBlock';
+import { generateInputSuggestion } from './services/api';
+import { generateInputSuggestionAsync } from './services/api';
 
 console.log('App.tsx: 所有 import 完成');
 // 定义当前激活的模块类型
@@ -19,8 +21,11 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
+  const [inputSuggestions, setInputSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
   // 当前激活的模块
   const [activeModule, setActiveModule] = useState<ActiveModule>('input');
   // 用于跟踪会话切换
@@ -68,6 +73,30 @@ const App: React.FC = () => {
     clearDesign,
   } = useDesignContext();
 
+  // 添加一个 useEffect 来监听消息变化并生成建议
+  useEffect(() => {
+    const generateSuggestions = async () => {
+      if (messages.length > 0 && !isLoading) {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.role === 'assistant' && !lastMessage.isStreaming) {
+          setIsSuggestionsLoading(true);  // 开始加载
+          
+          const apiMessages = messages.map(m => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content
+          }));
+          
+          const suggestions = await generateInputSuggestionAsync(apiMessages);
+          setInputSuggestions(suggestions);
+          setShowSuggestions(suggestions.length > 0);
+          setIsSuggestionsLoading(false);  // 加载完成
+        }
+      }
+    };
+    
+    generateSuggestions();
+  }, [messages, isLoading]);
+
   // 监听是否应该显示下载面板
   useEffect(() => {
     if (designState.shouldShowDownload) {
@@ -80,6 +109,39 @@ const App: React.FC = () => {
     }
   }, [designState.shouldShowDownload, messages, extractFromMessages, clearShowDownload]);
 
+  // 添加一个 useEffect 来监听消息变化并生成建议
+  useEffect(() => {
+    if (messages.length > 0 && !isLoading) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant' && !lastMessage.isStreaming) {
+        // 将 ChatMessage 转换为 Message 格式
+        const apiMessages = messages.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content
+        }));
+        const suggestions = generateInputSuggestion(apiMessages);
+        setInputSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+      }
+    }
+  }, [messages, isLoading]);
+
+  // 当用户开始输入时，如果内容为空则继续显示建议，否则隐藏
+  useEffect(() => {
+    if (inputValue.trim().length > 0) {
+      setShowSuggestions(false);
+    } else if (inputSuggestions.length > 0) {
+      setShowSuggestions(true);
+    }
+  }, [inputValue, inputSuggestions]);
+
+  // 处理选择建议
+  const handleSelectSuggestion = (suggestion: string) => {
+    setInputValue(suggestion);
+    setShowSuggestions(false);
+    textareaRef.current?.focus();
+  };
+
   // 开始新对话
   const handleNewChat = useCallback(() => {
     createNewSession();
@@ -88,6 +150,8 @@ const App: React.FC = () => {
     resetDesignState();
     setShowDownloadPanel(false);
     setActiveModule('input');
+    setInputSuggestions([]); // 清空建议
+    setShowSuggestions(false);
   }, [createNewSession, clear, clearDesign, resetDesignState]);
 
   // 切换到历史对话
@@ -98,6 +162,8 @@ const App: React.FC = () => {
     resetDesignState();
     clearDesign();
     setActiveModule('input');
+    setInputSuggestions([]); // 清空建议
+    setShowSuggestions(false);
   }, [switchSession, resetDesignState, clearDesign]);
 
   // 处理下载面板确认后的操作
@@ -354,6 +420,8 @@ const App: React.FC = () => {
     
     const message = inputValue;
     setInputValue('');
+    setInputSuggestions([]); // 清空建议
+    setShowSuggestions(false);
     await send(message);
   };
 
@@ -739,12 +807,42 @@ const App: React.FC = () => {
 
         {/* Input Area */}
         <div className="p-3 md:p-4 shrink-0">
+          {/* 智能建议 - 只在没有显示下载面板和确认横幅时显示 */}
+          {(showSuggestions || isSuggestionsLoading) && 
+          !isLoading && 
+          !showDownloadPanel &&  // 新增：下载面板显示时不显示建议
+          !designState.isConfirmed &&  // 新增：参数确认时不显示建议
+          !designState.isAskingForGeneration &&  // 新增：询问生成方案时不显示建议
+          (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span className="text-xs text-gray-400 w-full mb-1">💡 猜你想说：</span>
+              {isSuggestionsLoading ? (
+                <span className="text-xs text-gray-400">正在思考...</span>
+              ) : (
+                inputSuggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSelectSuggestion(suggestion)}
+                    className="px-3 py-1.5 text-sm bg-gray-50 hover:bg-[#E0E7FF] text-gray-600 hover:text-[#5B5FC7] rounded-full border border-gray-200 hover:border-[#5B5FC7]/30 transition-all duration-200"
+                  >
+                    {suggestion}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
           <div className="border border-[#5B5FC7]/30 rounded-2xl p-2 md:p-3 bg-white shadow-sm flex flex-col relative focus-within:ring-1 focus-within:ring-[#5B5FC7]/20 transition-all">
             <textarea 
               ref={textareaRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (inputValue.trim().length === 0 && inputSuggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
               className="w-full resize-none outline-none text-sm text-gray-700 placeholder-gray-400 min-h-[40px] md:min-h-[50px] max-h-[150px] mb-2 bg-transparent" 
               placeholder="给PEC-AI发送消息（Enter 发送，Shift+Enter 换行）"
               disabled={isLoading}
@@ -776,7 +874,7 @@ const App: React.FC = () => {
           </div>
           <div className="text-center text-[10px] text-gray-300 mt-2">内容由 AI 生成</div>
         </div>
-      </div>
+      </div> 
 
       {/* Professional Mode Panel */}
       {isProMode && (

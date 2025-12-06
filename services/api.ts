@@ -18,7 +18,8 @@ export interface StreamCallbacks {
 // 魔塔社区 API 配置
 const API_KEY = 'ms-88261760-4c02-4a0d-99ac-635693f9bacf';
 const API_URL = 'https://api-inference.modelscope.cn/v1/chat/completions';
-const MODEL = 'deepseek-ai/DeepSeek-V3.2-Exp';
+// const MODEL = 'deepseek-ai/DeepSeek-V3.2-Exp';
+const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
 
 // 设计引导系统提示词（信息输入模式）
 const DESIGN_GUIDE_PROMPT = `你是 PEC-AI，一个专业的电力电子变换器设计助手。你的任务是通过友好的多轮对话，引导用户完善设计需求。
@@ -151,6 +152,95 @@ const QA_MODE_PROMPT = `你是 PEC-AI，一个专业的电力电子变换器设�
 推荐的PI参数为：Kp = 0.05, Ki = 500（这些数值需要根据实际系统进行调整）。
 
 您想了解更详细的传递函数推导过程吗？`;
+
+// services/api.ts - 在文件中添加以下内容
+
+// 用于生成输入建议的系统提示词
+const SUGGESTION_PROMPT = `你是一个对话建议生成器。根据AI助手的最后一条回复，预测用户最可能的回应。
+
+【任务】
+分析AI的回复内容，判断AI在问什么问题，然后生成3个用户最可能给出的简短回答。
+
+【输出格式】
+只输出3个建议，每个建议占一行，不要有编号、引号或其他符号。
+每个建议应该是用户的直接回答，简洁明了，不超过20个字。
+
+【示例】
+如果AI问"请问输出功率是多少？"，你应该输出：
+500W
+1000W
+200W
+
+如果AI问"请确认以上参数是否正确？"，你应该输出：
+确认，没问题
+参数正确，可以生成
+我想修改输出功率
+
+如果AI问"您需要什么类型的拓扑？"，你应该输出：
+升压变换器 Boost
+降压变换器 Buck
+升降压变换器
+
+【注意】
+1. 建议必须与AI的提问直接相关
+2. 建议应该是用户的回答，不是AI的话
+3. 如果AI没有明确提问，返回空`;
+
+// 通过 AI 生成输入建议（异步）
+export async function generateInputSuggestionAsync(messages: Message[]): Promise<string[]> {
+  if (messages.length === 0) return [];
+  
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage.role !== 'assistant') return [];
+  
+  // 检查AI回复中是否有问号，如果没有问号可能不需要建议
+  if (!lastMessage.content.includes('？') && !lastMessage.content.includes('?')) {
+    return [];
+  }
+  
+  try {
+    const requestBody = {
+      model: MODEL,
+      messages: [
+        { role: 'system', content: SUGGESTION_PROMPT },
+        { role: 'user', content: `AI助手的回复：\n${lastMessage.content}\n\n请生成3个用户可能的回答建议：` }
+      ],
+      temperature: 0.7,
+      max_tokens: 200,
+    };
+
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      console.error('建议生成API请求失败:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    // 解析返回的建议（按行分割，过滤空行）
+    const suggestions = content
+      .split('\n')
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0 && line.length <= 30)  // 过滤空行和过长的内容
+      .slice(0, 3);  // 最多3个建议
+    
+    console.log('AI生成的建议:', suggestions);
+    return suggestions;
+    
+  } catch (error) {
+    console.error('生成建议失败:', error);
+    return [];
+  }
+}
 
 // 清理 Markdown 符号
 function cleanMarkdown(text: string): string {
@@ -337,4 +427,187 @@ export async function sendMessage(
   }
 }
 
+// 根据对话上下文生成输入建议
+// services/api.ts - 替换原有的 generateInputSuggestion 函数
+export function generateInputSuggestion(messages: Message[]): string[] {
+  if (messages.length === 0) return [];
+  
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage.role !== 'assistant') return [];
+  
+  const content = lastMessage.content;
+  const contentLower = content.toLowerCase();
+  const suggestions: string[] = [];
+  
+  // 获取所有历史对话内容，用于判断哪些信息已经收集了
+  const allContent = messages.map(m => m.content).join(' ').toLowerCase();
+  
+  // 检查是否已经确认了某些参数
+  const hasVoltage = /\d+\s*[vV]/.test(allContent);
+  const hasPower = /\d+\s*[wW瓦]/.test(allContent);
+  const hasTopology = /boost|buck|升压|降压/.test(allContent);
+  
+  // ========== 精确匹配 AI 的具体提问 ==========
+  
+  // AI 询问功率 - 最高优先级匹配
+  if (contentLower.includes('功率是多少') || 
+      contentLower.includes('输出功率') && contentLower.includes('？') ||
+      contentLower.includes('功率需求') ||
+      contentLower.includes('多少瓦') ||
+      contentLower.includes('功率等级')) {
+    suggestions.push('输出功率 500W');
+    suggestions.push('1kW');
+    suggestions.push('200W');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问输入电压
+  if ((contentLower.includes('输入电压') && contentLower.includes('？')) ||
+      contentLower.includes('输入电压范围') && contentLower.includes('？') ||
+      contentLower.includes('电压范围是多少')) {
+    suggestions.push('输入电压 36V - 60V');
+    suggestions.push('输入电压 48V');
+    suggestions.push('电压范围 40V 到 55V');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问输出电压
+  if ((contentLower.includes('输出电压') && contentLower.includes('？')) ||
+      contentLower.includes('输出电压是多少') ||
+      contentLower.includes('需要输出多少伏')) {
+    suggestions.push('输出电压 100V');
+    suggestions.push('输出 48V');
+    suggestions.push('输出电压 400V');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问拓扑类型
+  if (contentLower.includes('拓扑') && contentLower.includes('？') ||
+      contentLower.includes('什么类型') ||
+      contentLower.includes('哪种电路') ||
+      contentLower.includes('选择什么拓扑')) {
+    suggestions.push('升压变换器 (Boost)');
+    suggestions.push('降压变换器 (Buck)');
+    suggestions.push('升降压变换器 (Buck-Boost)');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问优化目标/偏好
+  if (contentLower.includes('优化目标') ||
+      contentLower.includes('设计偏好') ||
+      contentLower.includes('侧重') && contentLower.includes('？') ||
+      contentLower.includes('效率') && contentLower.includes('成本') && contentLower.includes('？') ||
+      contentLower.includes('优先考虑')) {
+    suggestions.push('效率优先');
+    suggestions.push('成本优先');
+    suggestions.push('均衡设计');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问确认参数
+  if (contentLower.includes('确认') && contentLower.includes('参数') ||
+      contentLower.includes('是否正确') ||
+      contentLower.includes('请确认') ||
+      contentLower.includes('以上参数')) {
+    suggestions.push('确认，没问题');
+    suggestions.push('参数正确');
+    suggestions.push('我想修改一下');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问是否生成方案
+  if (contentLower.includes('是否需要') && contentLower.includes('生成') ||
+      contentLower.includes('生成') && contentLower.includes('方案') && contentLower.includes('？') ||
+      contentLower.includes('是否立即生成') ||
+      contentLower.includes('可以为您生成')) {
+    suggestions.push('好的，请生成方案');
+    suggestions.push('是的，生成吧');
+    suggestions.push('我想再调整一下');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问应用场景
+  if (contentLower.includes('应用场景') ||
+      contentLower.includes('用途') && contentLower.includes('？') ||
+      contentLower.includes('用在哪')) {
+    suggestions.push('光伏储能系统');
+    suggestions.push('电动汽车充电');
+    suggestions.push('工业电源');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问环境温度
+  if (contentLower.includes('环境温度') ||
+      contentLower.includes('工作温度') ||
+      contentLower.includes('温度范围')) {
+    suggestions.push('环境温度 50°C');
+    suggestions.push('常温 25°C');
+    suggestions.push('高温环境 70°C');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问单相/三相
+  if (contentLower.includes('单相') && contentLower.includes('三相') ||
+      contentLower.includes('几相')) {
+    suggestions.push('单相');
+    suggestions.push('三相');
+    return suggestions;
+  }
+  
+  // AI 询问并网/离网
+  if (contentLower.includes('并网') || contentLower.includes('离网')) {
+    suggestions.push('并网型');
+    suggestions.push('离网型');
+    return suggestions;
+  }
+  
+  // AI 询问开关频率
+  if (contentLower.includes('开关频率') ||
+      contentLower.includes('频率') && contentLower.includes('？')) {
+    suggestions.push('100kHz');
+    suggestions.push('50kHz');
+    suggestions.push('使用默认频率');
+    return suggestions.slice(0, 3);
+  }
+  
+  // AI 询问纹波要求
+  if (contentLower.includes('纹波') && contentLower.includes('？')) {
+    suggestions.push('纹波小于 1%');
+    suggestions.push('纹波小于 5%');
+    suggestions.push('使用默认值');
+    return suggestions.slice(0, 3);
+  }
+  
+  // ========== 如果没有匹配到具体问题，根据已收集的信息推断 ==========
+  
+  // 如果 AI 回复中包含"还有什么问题"或类似的结束语
+  if (contentLower.includes('还有什么') ||
+      contentLower.includes('其他问题') ||
+      contentLower.includes('帮您的')) {
+    suggestions.push('没有了，谢谢');
+    suggestions.push('我想了解更多细节');
+    return suggestions;
+  }
+  
+  // 如果没有收集拓扑
+  if (!hasTopology && contentLower.includes('？')) {
+    suggestions.push('升压变换器');
+    return suggestions;
+  }
+  
+  // 如果没有收集电压
+  if (!hasVoltage && contentLower.includes('？')) {
+    suggestions.push('输入 48V，输出 100V');
+    return suggestions;
+  }
+  
+  // 如果没有收集功率
+  if (!hasPower && contentLower.includes('？')) {
+    suggestions.push('输出功率 500W');
+    return suggestions;
+  }
+  
+  // 默认不返回建议（避免不相关的建议）
+  return [];
+}
 console.log('=== api.ts 加载完成 ===');
