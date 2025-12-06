@@ -727,9 +727,9 @@ const App: React.FC = () => {
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
                 {[
-                  '帮我设计一个500W的升压变换器',
-                  '48V转100V的DC/DC该选什么拓扑？',
-                  '如何计算MOSFET的导通损耗？',
+                  '导师让我做一个500W升压电路，从哪入手？',
+                  '参照主流方案，设计一个40kW三相光伏逆变器',
+                  '老板要求48V转100V成本最低，选什么拓扑？',
                   '推荐一个10kW光伏逆变器方案'
                 ].map((suggestion, idx) => (
                   <button

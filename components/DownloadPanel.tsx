@@ -60,7 +60,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({ icon, title, description, o
   >
     <div className={`shrink-0 ${disabled ? 'text-gray-400' : 'text-[#5B5FC7]'}`}>{icon}</div>
     <div className="flex-1 min-w-0">
-      <div className={`text-sm font-medium ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>{title}</div>
+      <div className={`text-sm font-medium ${disabled ? 'text-gray-400' : 'text-gray-700'} truncate`}>{title}</div>
       <div className="text-xs text-gray-400 truncate">{description}</div>
     </div>
   </button>
@@ -92,11 +92,12 @@ const Section: React.FC<SectionProps> = ({ title, children, defaultExpanded = tr
 // 生成状态类型
 type GenerationStatus = 'idle' | 'generating' | 'completed';
 
-// 生成进度步骤
+// 生成进度步骤 - 包含权重
 interface GenerationStep {
   id: string;
   name: string;
   status: 'pending' | 'processing' | 'completed';
+  weight: number; // 时间权重（占总时间的百分比）
 }
 
 const DownloadPanel: React.FC<DownloadPanelProps> = ({ 
@@ -116,22 +117,30 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
   const [estimatedTime, setEstimatedTime] = useState<number>(0); // 预计时间（分钟）
   const [elapsedTime, setElapsedTime] = useState<number>(0); // 已用时间（秒）
   const [currentStep, setCurrentStep] = useState<number>(0);
+  
+  // 6个步骤，每个步骤有不同的时间权重
   const [generationSteps, setGenerationSteps] = useState<GenerationStep[]>([
-    { id: 'analyze', name: '分析设计参数', status: 'pending' },
-    { id: 'optimize', name: '运行多目标优化算法', status: 'pending' },
-    { id: 'select', name: '筛选帕累托最优解', status: 'pending' },
-    { id: 'mosfet', name: '选择MOSFET器件', status: 'pending' },
-    { id: 'diode', name: '选择二极管', status: 'pending' },
-    { id: 'inductor', name: '设计电感', status: 'pending' },
-    { id: 'capacitor', name: '选择电容', status: 'pending' },
-    { id: 'thermal', name: '热分析计算', status: 'pending' },
-    { id: 'report', name: '生成设计报告', status: 'pending' },
+    { id: 'semiconductor', name: '半导体器件迭代优化', status: 'pending', weight: 25 },
+    { id: 'inductor', name: '电感参数迭代优化', status: 'pending', weight: 20 },
+    { id: 'capacitor', name: '电容参数迭代优化', status: 'pending', weight: 15 },
+    { id: 'pareto', name: '筛选帕累托最优解', status: 'pending', weight: 20 },
+    { id: 'report', name: '生成设计报告', status: 'pending', weight: 10 },
+    { id: 'package', name: '报告资料打包', status: 'pending', weight: 10 },
   ]);
 
   // 随机选择延迟时间（1、1.5、2分钟）
   const getRandomDelayMinutes = (): number => {
     const delays = [1, 1.5, 2];
     return delays[Math.floor(Math.random() * delays.length)];
+  };
+
+  // 计算累积权重阈值
+  const getWeightThresholds = () => {
+    let cumulative = 0;
+    return generationSteps.map(step => {
+      cumulative += step.weight;
+      return cumulative;
+    });
   };
 
   // 开始生成方案
@@ -156,12 +165,19 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
           const newTime = prev + 1;
           const totalSeconds = estimatedTime * 60;
           
-          // 计算当前应该在哪个步骤
-          const progress = newTime / totalSeconds;
-          const stepIndex = Math.min(
-            Math.floor(progress * generationSteps.length),
-            generationSteps.length - 1
-          );
+          // 计算当前进度百分比
+          const progressPercent = (newTime / totalSeconds) * 100;
+          
+          // 根据权重阈值确定当前步骤
+          const thresholds = getWeightThresholds();
+          let stepIndex = 0;
+          for (let i = 0; i < thresholds.length; i++) {
+            if (progressPercent < thresholds[i]) {
+              stepIndex = i;
+              break;
+            }
+            stepIndex = i;
+          }
           
           // 更新步骤状态
           setGenerationSteps(prevSteps => 
@@ -191,20 +207,7 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [generationStatus, estimatedTime, generationSteps.length]);
-
-  // 格式化剩余时间
-  const formatRemainingTime = (): string => {
-    const totalSeconds = estimatedTime * 60;
-    const remaining = Math.max(0, totalSeconds - elapsedTime);
-    const minutes = Math.floor(remaining / 60);
-    const seconds = Math.floor(remaining % 60);
-    
-    if (minutes > 0) {
-      return `${minutes}分${seconds.toString().padStart(2, '0')}秒`;
-    }
-    return `${seconds}秒`;
-  };
+  }, [generationStatus, estimatedTime]);
 
   // 计算进度百分比
   const getProgressPercentage = (): number => {
@@ -213,13 +216,21 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
     return Math.min(99, Math.round((elapsedTime / (estimatedTime * 60)) * 100));
   };
 
+  // 格式化预计时间显示
+  const formatEstimatedTime = (): string => {
+    if (estimatedTime === 1) return '1 分钟';
+    if (estimatedTime === 1.5) return '1 分 30 秒';
+    if (estimatedTime === 2) return '2 分钟';
+    return `${estimatedTime} 分钟`;
+  };
+
   // 如果正在提取
   if (isExtracting) {
     return (
-      <div className="bg-[#F0F5FF] rounded-2xl p-6 max-w-full shadow-sm">
-        <div className="flex flex-col items-center justify-center py-8">
-          <Loader2 className="w-12 h-12 text-[#5B5FC7] animate-spin mb-4" />
-          <p className="text-sm text-gray-600">正在分析对话内容，提取设计参数...</p>
+      <div className="bg-[#F0F5FF] rounded-2xl p-4 md:p-6 w-full max-w-full shadow-sm">
+        <div className="flex flex-col items-center justify-center py-6 md:py-8">
+          <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-[#5B5FC7] animate-spin mb-4" />
+          <p className="text-sm text-gray-600 text-center">正在分析对话内容，提取设计参数...</p>
           <p className="text-xs text-gray-400 mt-2">这可能需要几秒钟</p>
         </div>
       </div>
@@ -229,19 +240,19 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
   // 如果没有有效设计
   if (!hasValidDesign || !designParams || !designResult) {
     return (
-      <div className="bg-[#FFF7ED] rounded-2xl p-6 max-w-full shadow-sm">
+      <div className="bg-[#FFF7ED] rounded-2xl p-4 md:p-6 w-full max-w-full shadow-sm">
         <div className="flex items-start space-x-3 mb-4">
-          <AlertTriangle className="w-6 h-6 text-orange-500 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-gray-800 mb-1">设计信息不完整</h3>
-            <p className="text-sm text-gray-600 mb-3">
+          <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-orange-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-gray-800 mb-1 text-sm md:text-base">设计信息不完整</h3>
+            <p className="text-xs md:text-sm text-gray-600 mb-3">
               需要更多信息才能生成设计方案。请在对话中提供以下参数：
             </p>
-            <ul className="text-sm text-gray-500 space-y-1">
+            <ul className="text-xs md:text-sm text-gray-500 space-y-1">
               {extractedDesign?.missingFields.map((field, idx) => (
                 <li key={idx} className="flex items-center space-x-2">
-                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                  <span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full shrink-0"></span>
+                  <span className="truncate">
                     {field === 'inputVoltage' && '输入电压（如：48V）'}
                     {field === 'outputVoltage' && '输出电压（如：100V）'}
                     {field === 'outputPower' && '输出功率（如：500W）'}
@@ -261,13 +272,13 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
   // 如果还没开始生成或正在生成中
   if (generationStatus === 'idle' || generationStatus === 'generating') {
     return (
-      <div className="bg-[#F0F5FF] rounded-2xl p-4 md:p-5 max-w-full shadow-sm">
+      <div className="bg-[#F0F5FF] rounded-2xl p-3 md:p-5 w-full max-w-full shadow-sm">
         {/* AI 头像和标题 */}
         <div className="flex items-start space-x-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
-            <Bot className="text-white w-5 h-5" />
+          <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
+            <Bot className="text-white w-4 h-4 md:w-5 md:h-5" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-gray-800">[PEC-AI] 设计方案生成</div>
             <div className="text-xs text-gray-500 mt-0.5">
               {generationStatus === 'idle' ? '准备就绪' : '正在生成中...'}
@@ -277,43 +288,43 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
 
         {/* 设计摘要 */}
         {extractedDesign && (
-          <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-            <div className="text-sm text-gray-600 mb-2">提取的设计需求:</div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex justify-between">
+          <div className="bg-white rounded-xl p-3 md:p-4 mb-4 shadow-sm">
+            <div className="text-xs md:text-sm text-gray-600 mb-2">提取的设计需求:</div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
                 <span className="text-gray-500">拓扑:</span>
-                <span className="font-medium">
-                  {extractedDesign.topology === 'boost' ? '升压 (Boost)' :
-                  extractedDesign.topology === 'buck' ? '降压 (Buck)' :
-                  extractedDesign.topology === 'buck-boost' ? '升降压 (Buck-Boost)' :
+                <span className="font-medium truncate ml-1">
+                  {extractedDesign.topology === 'boost' ? 'Boost' :
+                  extractedDesign.topology === 'buck' ? 'Buck' :
+                  extractedDesign.topology === 'buck-boost' ? 'Buck-Boost' :
                   extractedDesign.topology}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">输入电压:</span>
-                <span className="font-medium">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">输入:</span>
+                <span className="font-medium truncate ml-1">
                   {extractedDesign.inputVoltageMin && extractedDesign.inputVoltageMax 
-                    ? `${extractedDesign.inputVoltageMin}V~${extractedDesign.inputVoltageMax}V`
+                    ? `${extractedDesign.inputVoltageMin}-${extractedDesign.inputVoltageMax}V`
                     : `${extractedDesign.inputVoltage}V`}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">输出电压:</span>
-                <span className="font-medium">{extractedDesign.outputVoltage}V</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">输出:</span>
+                <span className="font-medium truncate ml-1">{extractedDesign.outputVoltage}V</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">输出功率:</span>
-                <span className="font-medium">{extractedDesign.outputPower}W</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">功率:</span>
+                <span className="font-medium truncate ml-1">{extractedDesign.outputPower}W</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">优化策略:</span>
-                <span className="font-medium">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">策略:</span>
+                <span className="font-medium truncate ml-1">
                   {extractedDesign.priority === 'efficiency' ? '效率优先' :
                   extractedDesign.priority === 'cost' ? '成本优先' :
                   extractedDesign.priority === 'volume' ? '体积优先' : '均衡设计'}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-gray-500">置信度:</span>
                 <span className={`font-medium ${extractedDesign.confidence > 0.8 ? 'text-green-600' : extractedDesign.confidence > 0.5 ? 'text-yellow-600' : 'text-orange-500'}`}>
                   {(extractedDesign.confidence * 100).toFixed(0)}%
@@ -325,12 +336,12 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
 
         {/* 生成状态 */}
         {generationStatus === 'generating' ? (
-          <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+          <div className="bg-white rounded-xl p-3 md:p-4 mb-4 shadow-sm">
             {/* 进度条 */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">生成进度</span>
-                <span className="text-sm text-[#5B5FC7] font-medium">{getProgressPercentage()}%</span>
+                <span className="text-xs md:text-sm font-medium text-gray-700">生成进度</span>
+                <span className="text-xs md:text-sm text-[#5B5FC7] font-medium">{getProgressPercentage()}%</span>
               </div>
               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div 
@@ -340,34 +351,34 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
               </div>
             </div>
 
-            {/* 时间信息 */}
-            <div className="flex items-center justify-between text-sm mb-4 p-3 bg-[#F0F5FF] rounded-lg">
+            {/* 预计时间信息 */}
+            <div className="flex items-center justify-between text-xs md:text-sm mb-4 p-2 md:p-3 bg-[#F0F5FF] rounded-lg">
               <div className="flex items-center space-x-2">
-                <Clock size={16} className="text-[#5B5FC7]" />
-                <span className="text-gray-600">预计剩余时间</span>
+                <Clock size={14} className="text-[#5B5FC7]" />
+                <span className="text-gray-600">预计耗时</span>
               </div>
-              <span className="font-medium text-[#5B5FC7]">{formatRemainingTime()}</span>
+              <span className="font-medium text-[#5B5FC7]">{formatEstimatedTime()}</span>
             </div>
 
             {/* 步骤列表 */}
-            <div className="space-y-2">
-              {generationSteps.map((step, idx) => (
+            <div className="space-y-1.5 md:space-y-2">
+              {generationSteps.map((step) => (
                 <div 
                   key={step.id}
-                  className={`flex items-center space-x-3 p-2 rounded-lg transition-all duration-300 ${
+                  className={`flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2 rounded-lg transition-all duration-300 ${
                     step.status === 'processing' ? 'bg-[#EEF2FF]' : ''
                   }`}
                 >
-                  <div className="w-5 h-5 flex items-center justify-center">
+                  <div className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center shrink-0">
                     {step.status === 'completed' ? (
-                      <CheckCircle size={18} className="text-green-500" />
+                      <CheckCircle size={16} className="text-green-500" />
                     ) : step.status === 'processing' ? (
-                      <Loader2 size={18} className="text-[#5B5FC7] animate-spin" />
+                      <Loader2 size={16} className="text-[#5B5FC7] animate-spin" />
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+                      <div className="w-3 h-3 md:w-4 md:h-4 rounded-full border-2 border-gray-300"></div>
                     )}
                   </div>
-                  <span className={`text-sm ${
+                  <span className={`text-xs md:text-sm truncate ${
                     step.status === 'completed' ? 'text-green-600' :
                     step.status === 'processing' ? 'text-[#5B5FC7] font-medium' :
                     'text-gray-400'
@@ -379,29 +390,30 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
             </div>
 
             {/* 提示信息 */}
-            <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+            <div className="mt-3 md:mt-4 p-2 md:p-3 bg-yellow-50 rounded-lg">
               <p className="text-xs text-yellow-700">
-                💡 正在运行多目标优化算法，探索数万种元器件组合以找到最优方案...
+                💡 正在运行多目标优化算法，探索数万种元器件组合...
               </p>
             </div>
           </div>
         ) : (
           /* 开始生成按钮 */
-          <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+          <div className="bg-white rounded-xl p-3 md:p-4 mb-4 shadow-sm">
             <div className="text-center">
-              <div className="mb-4">
-                <div className="w-16 h-16 mx-auto bg-[#EEF2FF] rounded-full flex items-center justify-center mb-3">
-                  <Package size={32} className="text-[#5B5FC7]" />
+              <div className="mb-3 md:mb-4">
+                <div className="w-12 h-12 md:w-16 md:h-16 mx-auto bg-[#EEF2FF] rounded-full flex items-center justify-center mb-2 md:mb-3">
+                  <Package size={24} className="text-[#5B5FC7] md:hidden" />
+                  <Package size={32} className="text-[#5B5FC7] hidden md:block" />
                 </div>
-                <h3 className="font-medium text-gray-800 mb-1">准备生成设计方案</h3>
-                <p className="text-sm text-gray-500">
-                  PEC-AI 将为您运行多目标优化算法，生成完整的设计文档包
+                <h3 className="font-medium text-gray-800 mb-1 text-sm md:text-base">准备生成设计方案</h3>
+                <p className="text-xs md:text-sm text-gray-500">
+                  PEC-AI 将为您运行多目标优化算法
                 </p>
               </div>
               
-              <div className="text-xs text-gray-400 mb-4 p-3 bg-gray-50 rounded-lg">
-                <p className="mb-1">将生成以下文件：</p>
-                <ul className="space-y-1">
+              <div className="text-xs text-gray-400 mb-3 md:mb-4 p-2 md:p-3 bg-gray-50 rounded-lg text-left">
+                <p className="mb-1 font-medium">将生成以下文件：</p>
+                <ul className="space-y-0.5">
                   <li>• 物料清单 (BOM)</li>
                   <li>• 完整设计报告</li>
                   <li>• 半导体选型与热分析</li>
@@ -412,13 +424,13 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
 
               <button
                 onClick={startGeneration}
-                className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-[#5B5FC7] to-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
+                className="w-full flex items-center justify-center px-4 py-2.5 md:py-3 bg-gradient-to-r from-[#5B5FC7] to-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
               >
-                <Download size={18} className="mr-2" />
+                <Download size={16} className="mr-2" />
                 开始生成设计方案
               </button>
               
-              <p className="text-xs text-gray-400 mt-3">
+              <p className="text-xs text-gray-400 mt-2 md:mt-3">
                 预计需要 1-2 分钟
               </p>
             </div>
@@ -496,179 +508,154 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
     }
   };
 
+  // 生成完成后的下载界面
   return (
-    <div className="bg-[#F0F5FF] rounded-2xl p-4 md:p-5 max-w-full shadow-sm">
+    <div className="bg-[#F0F5FF] rounded-2xl p-3 md:p-5 w-full max-w-full shadow-sm overflow-hidden">
       {/* AI 头像和标题 */}
-      <div className="flex items-start space-x-3 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
-          <Bot className="text-white w-5 h-5" />
+      <div className="flex items-start space-x-3 mb-3 md:mb-4">
+        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#5B5FC7] flex items-center justify-center shrink-0">
+          <Bot className="text-white w-4 h-4 md:w-5 md:h-5" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-gray-800">[PEC-AI] 设计方案已就绪</div>
           <div className="text-xs text-gray-500 mt-0.5">
-            优化完成，用时 {estimatedTime} 分钟
+            优化完成，用时 {formatEstimatedTime()}
           </div>
         </div>
       </div>
 
       {/* 成功提示 */}
-      <div className="bg-green-50 rounded-xl p-3 mb-4 flex items-center space-x-2">
-        <CheckCircle size={18} className="text-green-500" />
-        <span className="text-sm text-green-700">设计方案生成成功！共找到 3 个帕累托最优解</span>
+      <div className="bg-green-50 rounded-xl p-2.5 md:p-3 mb-3 md:mb-4 flex items-center space-x-2">
+        <CheckCircle size={16} className="text-green-500 shrink-0" />
+        <span className="text-xs md:text-sm text-green-700 truncate">设计方案生成成功！共找到 3 个帕累托最优解</span>
       </div>
 
-      {/* 设计摘要 */}
+      {/* 设计摘要 - 移动端简化显示 */}
       {extractedDesign && (
-        <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-          <div className="text-sm text-gray-600 mb-2">提取的设计需求:</div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="bg-white rounded-xl p-3 md:p-4 mb-3 md:mb-4 shadow-sm">
+          <div className="text-xs md:text-sm text-gray-600 mb-2">设计需求:</div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-500">拓扑:</span>
               <span className="font-medium">
-                {extractedDesign.topology === 'boost' ? '升压 (Boost)' :
-                extractedDesign.topology === 'buck' ? '降压 (Buck)' :
-                extractedDesign.topology === 'buck-boost' ? '升降压 (Buck-Boost)' :
-                extractedDesign.topology}
+                {extractedDesign.topology === 'boost' ? 'Boost' :
+                extractedDesign.topology === 'buck' ? 'Buck' : 'Buck-Boost'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">输入电压:</span>
+              <span className="text-gray-500">输入:</span>
               <span className="font-medium">
                 {extractedDesign.inputVoltageMin && extractedDesign.inputVoltageMax 
-                  ? `${extractedDesign.inputVoltageMin}V~${extractedDesign.inputVoltageMax}V`
+                  ? `${extractedDesign.inputVoltageMin}-${extractedDesign.inputVoltageMax}V`
                   : `${extractedDesign.inputVoltage}V`}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">输出电压:</span>
+              <span className="text-gray-500">输出:</span>
               <span className="font-medium">{extractedDesign.outputVoltage}V</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">输出功率:</span>
+              <span className="text-gray-500">功率:</span>
               <span className="font-medium">{extractedDesign.outputPower}W</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">优化策略:</span>
-              <span className="font-medium">
-                {extractedDesign.priority === 'efficiency' ? '效率优先' :
-                extractedDesign.priority === 'cost' ? '成本优先' :
-                extractedDesign.priority === 'volume' ? '体积优先' : '均衡设计'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">置信度:</span>
-              <span className={`font-medium ${extractedDesign.confidence > 0.8 ? 'text-green-600' : extractedDesign.confidence > 0.5 ? 'text-yellow-600' : 'text-orange-500'}`}>
-                {(extractedDesign.confidence * 100).toFixed(0)}%
-              </span>
             </div>
           </div>
         </div>
       )}
 
-      {/* 核心指标 */}
-      <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-        <div className="text-sm text-gray-600 mb-3">优化结果:</div>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center space-x-2">
-            <CheckCircle size={16} className="text-green-500" />
+      {/* 核心指标 - 移动端紧凑布局 */}
+      <div className="bg-white rounded-xl p-3 md:p-4 mb-3 md:mb-4 shadow-sm">
+        <div className="text-xs md:text-sm text-gray-600 mb-2">优化结果:</div>
+        <div className="flex flex-wrap gap-2 md:gap-4 text-xs md:text-sm">
+          <div className="flex items-center space-x-1">
+            <CheckCircle size={14} className="text-green-500 shrink-0" />
             <span className="text-gray-700">效率: <strong className="text-[#2F54EB]">{designResult.efficiency.toFixed(1)}%</strong></span>
           </div>
-          <div className="flex items-center space-x-2">
-            <CheckCircle size={16} className="text-green-500" />
+          <div className="flex items-center space-x-1">
+            <CheckCircle size={14} className="text-green-500 shrink-0" />
             <span className="text-gray-700">成本: <strong className="text-[#2F54EB]">¥{designResult.cost}</strong></span>
           </div>
-          <div className="flex items-center space-x-2">
-            <CheckCircle size={16} className="text-green-500" />
-            <span className="text-gray-700">体积: <strong className="text-[#2F54EB]">{designResult.volume} dm³</strong></span>
+          <div className="flex items-center space-x-1">
+            <CheckCircle size={14} className="text-green-500 shrink-0" />
+            <span className="text-gray-700">体积: <strong className="text-[#2F54EB]">{designResult.volume}dm³</strong></span>
           </div>
         </div>
       </div>
 
       {/* 文件清单标题 */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-gray-700">文件清单</span>
+      <div className="flex items-center justify-between mb-2 md:mb-3">
+        <span className="text-xs md:text-sm font-medium text-gray-700">文件清单</span>
         <button 
           onClick={handleDownloadAll}
           disabled={downloadingAll}
-          className="flex items-center space-x-1.5 bg-[#5B5FC7] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#4a4ea3] transition-colors disabled:opacity-50"
+          className="flex items-center space-x-1 bg-[#5B5FC7] text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs font-medium hover:bg-[#4a4ea3] transition-colors disabled:opacity-50"
         >
-          <Package size={14} />
-          <span>{downloadingAll ? '打包中...' : '一键打包下载'}</span>
+          <Package size={12} />
+          <span>{downloadingAll ? '打包中...' : '一键下载'}</span>
         </button>
       </div>
 
-      {/* 下载列表 */}
+      {/* 下载列表 - 移动端优化 */}
       <div className="bg-white rounded-xl overflow-hidden shadow-sm">
-        <div className="p-3">
-          <Section title="1. 核心设计文档">
+        <div className="p-2 md:p-3">
+          <Section title="1. 核心文档">
             <DownloadItem 
-              icon={<Table size={18} />}
-              title="物料清单 (BOM) [下载.csv]"
-              description="包含所有元器件的推荐型号、制造商、关键参数及预估成本"
+              icon={<Table size={16} />}
+              title="物料清单 (BOM)"
+              description="元器件型号、参数及成本"
               onClick={handleDownloadBOM}
             />
             <DownloadItem 
-              icon={<FileText size={18} />}
-              title="完整设计报告 [下载.pdf]"
-              description="包含系统规格、优化目标、BOM、损耗分析和热分析的完整报告"
+              icon={<FileText size={16} />}
+              title="完整设计报告"
+              description="系统规格、损耗与热分析"
               onClick={handleDownloadDesignReport}
             />
           </Section>
 
-          <Section title="2. 元器件详细设计报告">
+          <Section title="2. 元器件报告">
             <DownloadItem 
-              icon={<FileText size={18} />}
-              title="半导体选型与热分析 [下载.pdf]"
-              description="MOSFET和二极管的型号、损耗计算及预计结温"
+              icon={<FileText size={16} />}
+              title="半导体选型"
+              description="MOSFET/二极管型号及热分析"
               onClick={handleDownloadSemiconductorReport}
             />
             <DownloadItem 
-              icon={<FileText size={18} />}
-              title="磁性元件设计报告 [下载.pdf]"
-              description="电感的磁芯型号、匝数、气隙、损耗和温升计算"
+              icon={<FileText size={16} />}
+              title="磁性元件设计"
+              description="电感磁芯、匝数及损耗"
               onClick={handleDownloadInductorReport}
             />
             <DownloadItem 
-              icon={<FileText size={18} />}
-              title="电容选型报告 [下载.pdf]"
-              description="输入/输出电容的型号、纹波电流和电压计算"
+              icon={<FileText size={16} />}
+              title="电容选型"
+              description="输入/输出电容型号及纹波"
               onClick={handleDownloadCapacitorReport}
             />
           </Section>
 
-          <Section title="3. 仿真与验证文件 (可选)" defaultExpanded={false}>
+          <Section title="3. 仿真文件 (可选)" defaultExpanded={false}>
             <DownloadItem 
-              icon={<FileCode size={18} />}
-              title="性能仿真模型 [下载.plecs]"
-              description="预配置的仿真模型文件，可直接运行验证电路性能"
+              icon={<FileCode size={16} />}
+              title="性能仿真模型"
+              description="预配置的仿真模型文件"
               onClick={() => alert('仿真模型功能开发中...')}
-            />
-            <DownloadItem 
-              icon={<FileText size={18} />}
-              title="详细性能分析报告 [下载.pdf]"
-              description="包含效率曲线、损耗分布图、最差工况分析等详细图表"
-              onClick={handleDownloadDesignReport}
             />
           </Section>
         </div>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-200">
+      {/* 进入问答模式按钮 */}
+      <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-gray-200">
         <button
           onClick={onConfirm}
-          className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-[#5B5FC7] to-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
+          className="w-full flex items-center justify-center px-4 py-2.5 md:py-3 bg-gradient-to-r from-[#5B5FC7] to-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
         >
           <MessageSquare size={16} className="mr-2" />
-          下载完成，进入问答模式
+          进入问答模式
         </button>
         <p className="text-xs text-gray-400 text-center mt-2">
           您可以针对此方案向AI提问
         </p>
-      </div>
-
-      {/* 提示信息 */}
-      <div className="mt-4 text-xs text-gray-400 text-center">
-        所有文件由 PEC-AI 根据您的对话内容自动生成
       </div>
     </div>
   );
