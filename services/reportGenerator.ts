@@ -22,6 +22,7 @@ export interface DesignParams {
   maxCoreTemp: string;
   ripple: string;
   lRatio: string;
+  topology?: string;
 }
 
 // 设计结果接口
@@ -74,14 +75,24 @@ export interface DesignResult {
 
 // 根据参数生成模拟设计结果
 export function generateDesignResult(params: DesignParams): DesignResult {
-  console.log('generateDesignResult 被调用');
+  console.log('generateDesignResult 被调用, 参数:', params);
   const pOut = parseFloat(params.outputPower) || 500;
   const vIn = parseFloat(params.inputVoltage) || 48;
   const vOut = parseFloat(params.outputVoltage) || 100;
   const isPowerHigh = pOut > 300;
+  const topology = params.topology || 'boost';
   
-  // 计算占空比
-  const dutyRatio = 1 - vIn / vOut;
+  // 计算占空比（根据拓扑不同）
+  let dutyRatio: number;
+  if (topology === 'boost') {
+    dutyRatio = 1 - vIn / vOut;
+  } else if (topology === 'buck') {
+    dutyRatio = vOut / vIn;
+  } else {
+    dutyRatio = vOut / (vIn + vOut);
+  }
+  
+  console.log(`拓扑: ${topology}, 占空比: ${dutyRatio.toFixed(3)}`);
   
   return {
     efficiency: 98.2 + Math.random() * 0.5,

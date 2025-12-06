@@ -1,6 +1,21 @@
 // components/DownloadPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { Bot, Download, FileText, Table, FileCode, Package, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+// import { Bot, Download, FileText, Table, FileCode, Package, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Loader2, MessageSquare } from 'lucide-react';
+// App.tsx 第 5 行，在 import 中添加 CheckCircle
+import { 
+  Bot, 
+  Download, 
+  FileText, 
+  FileCode, 
+  Package, 
+  ChevronDown, 
+  ChevronRight, 
+  CheckCircle, 
+  AlertTriangle, 
+  Loader2, 
+  MessageSquare,
+  Table
+} from 'lucide-react';
 import {
   DesignParams,
   DesignResult,
@@ -23,6 +38,7 @@ interface DownloadPanelProps {
   isExtracting: boolean;
   hasValidDesign: boolean;
   onClose?: () => void;
+  onConfirm?: () => void;  // 新增：确认后的回调
 }
 
 interface DownloadItemProps {
@@ -87,7 +103,8 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
   designSummary,
   isExtracting,
   hasValidDesign,
-  onClose 
+  onClose,
+  onConfirm  // ← 添加这一行
 }) => {
   const [downloadingAll, setDownloadingAll] = useState(false);
 
@@ -194,6 +211,9 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
       await handleDownloadInductorReport();
       await new Promise(resolve => setTimeout(resolve, 300));
       await handleDownloadCapacitorReport();
+      
+      // 下载完成后调用确认回调
+      onConfirm?.();
     } catch (error) {
       console.error('批量下载失败:', error);
     } finally {
@@ -223,11 +243,20 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-500">拓扑:</span>
-              <span className="font-medium">{extractedDesign.topology}</span>
+              <span className="font-medium">
+                {extractedDesign.topology === 'boost' ? '升压 (Boost)' :
+                extractedDesign.topology === 'buck' ? '降压 (Buck)' :
+                extractedDesign.topology === 'buck-boost' ? '升降压 (Buck-Boost)' :
+                extractedDesign.topology}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">输入电压:</span>
-              <span className="font-medium">{extractedDesign.inputVoltage}V</span>
+              <span className="font-medium">
+                {extractedDesign.inputVoltageMin && extractedDesign.inputVoltageMax 
+                  ? `${extractedDesign.inputVoltageMin}V~${extractedDesign.inputVoltageMax}V`
+                  : `${extractedDesign.inputVoltage}V`}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">输出电压:</span>
@@ -241,13 +270,13 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
               <span className="text-gray-500">优化策略:</span>
               <span className="font-medium">
                 {extractedDesign.priority === 'efficiency' ? '效率优先' :
-                 extractedDesign.priority === 'cost' ? '成本优先' :
-                 extractedDesign.priority === 'volume' ? '体积优先' : '均衡设计'}
+                extractedDesign.priority === 'cost' ? '成本优先' :
+                extractedDesign.priority === 'volume' ? '体积优先' : '均衡设计'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">置信度:</span>
-              <span className={`font-medium ${extractedDesign.confidence > 0.8 ? 'text-green-600' : 'text-orange-500'}`}>
+              <span className={`font-medium ${extractedDesign.confidence > 0.8 ? 'text-green-600' : extractedDesign.confidence > 0.5 ? 'text-yellow-600' : 'text-orange-500'}`}>
                 {(extractedDesign.confidence * 100).toFixed(0)}%
               </span>
             </div>
@@ -341,6 +370,19 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
             />
           </Section>
         </div>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <button
+          onClick={onConfirm}
+          className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-[#5B5FC7] to-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
+        >
+          <MessageSquare size={16} className="mr-2" />
+          下载完成，进入问答模式
+        </button>
+        <p className="text-xs text-gray-400 text-center mt-2">
+          您可以针对此方案向AI提问
+        </p>
       </div>
 
       {/* 提示信息 */}

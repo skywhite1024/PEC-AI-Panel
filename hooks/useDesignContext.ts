@@ -19,6 +19,7 @@ export function useDesignContext() {
   const [isExtracting, setIsExtracting] = useState(false);
 
   // 从对话中提取设计参数
+  // hooks/useDesignContext.ts
   const extractFromMessages = useCallback(async (messages: ChatMessageForExtract[]) => {
     if (messages.length === 0) {
       console.log('没有消息，跳过提取');
@@ -35,7 +36,10 @@ export function useDesignContext() {
       
       setExtractedDesign(extracted);
       
+      // 转换为设计参数，包含拓扑信息
       const params = convertToDesignParams(extracted);
+      // 添加拓扑信息
+      params.topology = extracted.topology;
       setDesignParams(params);
       
       const result = generateDesignResult(params);
@@ -44,7 +48,7 @@ export function useDesignContext() {
       const summary = generateDesignSummary(extracted, result);
       setDesignSummary(summary);
       
-      console.log('设计方案生成完成');
+      console.log('设计方案生成完成, 拓扑:', extracted.topology);
     } catch (error) {
       console.error('提取设计参数失败:', error);
     } finally {
