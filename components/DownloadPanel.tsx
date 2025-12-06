@@ -1,6 +1,21 @@
 // components/DownloadPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { Bot, Download, FileText, Table, FileCode, Package, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+// import { Bot, Download, FileText, Table, FileCode, Package, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Loader2, MessageSquare } from 'lucide-react';
+// App.tsx 第 5 行，在 import 中添加 CheckCircle
+import { 
+  Bot, 
+  Download, 
+  FileText, 
+  FileCode, 
+  Package, 
+  ChevronDown, 
+  ChevronRight, 
+  CheckCircle, 
+  AlertTriangle, 
+  Loader2, 
+  MessageSquare,
+  Table
+} from 'lucide-react';
 import {
   DesignParams,
   DesignResult,
@@ -23,6 +38,7 @@ interface DownloadPanelProps {
   isExtracting: boolean;
   hasValidDesign: boolean;
   onClose?: () => void;
+  onConfirm?: () => void;  // 新增：确认后的回调
 }
 
 interface DownloadItemProps {
@@ -87,7 +103,8 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
   designSummary,
   isExtracting,
   hasValidDesign,
-  onClose 
+  onClose,
+  onConfirm  // ← 添加这一行
 }) => {
   const [downloadingAll, setDownloadingAll] = useState(false);
 
@@ -194,6 +211,9 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
       await handleDownloadInductorReport();
       await new Promise(resolve => setTimeout(resolve, 300));
       await handleDownloadCapacitorReport();
+      
+      // 下载完成后调用确认回调
+      onConfirm?.();
     } catch (error) {
       console.error('批量下载失败:', error);
     } finally {
@@ -350,6 +370,19 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
             />
           </Section>
         </div>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <button
+          onClick={onConfirm}
+          className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-[#5B5FC7] to-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
+        >
+          <MessageSquare size={16} className="mr-2" />
+          下载完成，进入问答模式
+        </button>
+        <p className="text-xs text-gray-400 text-center mt-2">
+          您可以针对此方案向AI提问
+        </p>
       </div>
 
       {/* 提示信息 */}

@@ -2,7 +2,7 @@
 console.log('=== App.tsx 模块开始加载 ===');
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, Paperclip, Mic, ArrowUp, Settings2, RotateCcw, ThumbsUp, ThumbsDown, Share2, Copy, FileEdit, CirclePlus, ChevronDown, LogIn, Download, MessageSquare, ArrowRightCircle, History, Menu, X, AlertCircle, Trash2 } from 'lucide-react';
+import { Bot, Paperclip, Mic, ArrowUp, Settings2, RotateCcw, ThumbsUp, ThumbsDown, Share2, Copy, FileEdit, CirclePlus, ChevronDown, LogIn, Download, MessageSquare, ArrowRightCircle, History, Menu, X, AlertCircle, Trash2, CheckCircle } from 'lucide-react';
 import ProfessionalPanel from './components/ProfessionalPanel';
 import { useChat, ChatMessage } from './hooks/useChat';
 import { useChatHistory } from './hooks/useChatHistory';
@@ -11,6 +11,8 @@ import { useDesignContext } from './hooks/useDesignContext';
 import ThinkingBlock from './components/ThinkingBlock';
 
 console.log('App.tsx: 所有 import 完成');
+// 定义当前激活的模块类型
+type ActiveModule = 'input' | 'download' | 'qa';
 
 const App: React.FC = () => {
   const [isProMode, setIsProMode] = useState(false);
@@ -19,6 +21,11 @@ const App: React.FC = () => {
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 当前激活的模块
+  const [activeModule, setActiveModule] = useState<ActiveModule>('input');
+  // 用于跟踪会话切换
+  const isSessionSwitchRef = useRef(false);
+  const prevSessionIdRef = useRef<string | null>(null);
 
   // 使用对话历史 hook
   const {
@@ -31,25 +38,25 @@ const App: React.FC = () => {
     getGroupedSessions,
   } = useChatHistory();
 
-  // 使用聊天 hook - 只声明一次！
+  // 从 useChat 获取新增的方法
   const { 
     messages, 
     isLoading, 
     error, 
     designState, 
+    chatMode,
     send, 
     clear, 
     retry, 
     setMessages, 
     resetDesignState,
-    clearShowDownload
+    clearShowDownload,
+    markDesignGenerated,
+    switchToQAMode,
+    switchToDesignMode,
   } = useChat();
 
-  // 用于跟踪会话切换
-  const isSessionSwitchRef = useRef(false);
-  const prevSessionIdRef = useRef<string | null>(null);
-
-  // 添加设计上下文
+  // ★★★ 将 useDesignContext 移到这里，在所有使用它的代码之前 ★★★
   const {
     extractedDesign,
     designParams,
@@ -60,6 +67,63 @@ const App: React.FC = () => {
     extractFromMessages,
     clearDesign,
   } = useDesignContext();
+
+  // 监听是否应该显示下载面板
+  useEffect(() => {
+    if (designState.shouldShowDownload) {
+      (async () => {
+        await extractFromMessages(messages);
+        setShowDownloadPanel(true);
+        setActiveModule('download');
+        clearShowDownload();
+      })();
+    }
+  }, [designState.shouldShowDownload, messages, extractFromMessages, clearShowDownload]);
+
+  // 开始新对话
+  const handleNewChat = useCallback(() => {
+    createNewSession();
+    clear();
+    clearDesign();
+    resetDesignState();
+    setShowDownloadPanel(false);
+    setActiveModule('input');
+  }, [createNewSession, clear, clearDesign, resetDesignState]);
+
+  // 切换到历史对话
+  const handleSwitchSession = useCallback((sessionId: string) => {
+    switchSession(sessionId);
+    setShowDownloadPanel(false);
+    setIsMobileMenuOpen(false);
+    resetDesignState();
+    clearDesign();
+    setActiveModule('input');
+  }, [switchSession, resetDesignState, clearDesign]);
+
+  // 处理下载面板确认后的操作
+  const handleDownloadConfirmed = useCallback(() => {
+    markDesignGenerated();
+    setActiveModule('qa');
+    switchToQAMode();
+    setShowDownloadPanel(false);
+    
+    const welcomeMessage: ChatMessage = {
+      id: `msg_${Date.now()}`,
+      role: 'assistant',
+      content: `您好！设计方案已生成完毕，现在进入问答阶段。
+
+您可以随时向我提问，无论是关于：
+1. 控制实现 - PWM策略、PI参数、MCU代码
+2. 元器件替换 - 备选型号、性能影响对比
+3. 设计原理 - 为什么选择这些元器件
+4. 优化建议 - 如何进一步提升性能
+5. 实际应用 - PCB布局、测试调试技巧
+
+请问有什么我可以帮您的？`,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, welcomeMessage]);
+  }, [markDesignGenerated, switchToQAMode, setMessages]);
 
   // 设计确认横幅组件
   const DesignConfirmBanner = () => {
@@ -83,6 +147,7 @@ const App: React.FC = () => {
                   resetDesignState();
                   await extractFromMessages(messages);
                   setShowDownloadPanel(true);
+                  setActiveModule('download');
                 }}
                 className="flex items-center px-4 py-2 bg-[#5B5FC7] text-white rounded-lg text-sm font-medium hover:bg-[#4a4ea3] transition-colors shadow-sm"
               >
@@ -105,17 +170,82 @@ const App: React.FC = () => {
       </div>
     );
   };
+  // 侧边栏菜单按钮的渲染 - 改为进度指示器（不可点击）
+  const renderMenuButtons = () => (
+    <div className="space-y-2 mb-8">
+      {/* 信息输入 - 始终可见，根据状态显示样式 */}
+      <div 
+        className={`w-full flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
+          activeModule === 'input'
+            ? 'bg-[#E0E7FF] text-[#5B5FC7] font-medium'
+            : 'text-gray-400'
+        }`}
+      >
+        <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+          activeModule === 'input' 
+            ? 'border-[#5B5FC7] bg-[#5B5FC7]' 
+            : activeModule === 'download' || activeModule === 'qa'
+              ? 'border-green-500 bg-green-500'
+              : 'border-gray-300'
+        }`}>
+          {(activeModule === 'download' || activeModule === 'qa') && (
+            <CheckCircle size={12} className="text-white" />
+          )}
+          {activeModule === 'input' && (
+            <div className="w-2 h-2 bg-white rounded-full"></div>
+          )}
+        </div>
+        信息输入
+      </div>
 
-  // 监听是否应该显示下载面板
-  useEffect(() => {
-    if (designState.shouldShowDownload) {
-      (async () => {
-        await extractFromMessages(messages);
-        setShowDownloadPanel(true);
-        clearShowDownload();
-      })();
-    }
-  }, [designState.shouldShowDownload, messages, extractFromMessages, clearShowDownload]);
+      {/* 方案下载 - 根据进度显示 */}
+      <div 
+        className={`w-full flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
+          activeModule === 'download'
+            ? 'bg-[#E0E7FF] text-[#5B5FC7] font-medium'
+            : activeModule === 'qa'
+              ? 'text-gray-400'
+              : 'text-gray-300'
+        }`}
+      >
+        <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+          activeModule === 'download'
+            ? 'border-[#5B5FC7] bg-[#5B5FC7]'
+            : activeModule === 'qa'
+              ? 'border-green-500 bg-green-500'
+              : 'border-gray-300'
+        }`}>
+          {activeModule === 'qa' && (
+            <CheckCircle size={12} className="text-white" />
+          )}
+          {activeModule === 'download' && (
+            <div className="w-2 h-2 bg-white rounded-full"></div>
+          )}
+        </div>
+        方案下载
+      </div>
+
+      {/* 用户提问 - 最后阶段 */}
+      <div 
+        className={`w-full flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
+          activeModule === 'qa'
+            ? 'bg-[#E0E7FF] text-[#5B5FC7] font-medium'
+            : 'text-gray-300'
+        }`}
+      >
+        <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+          activeModule === 'qa'
+            ? 'border-[#5B5FC7] bg-[#5B5FC7]'
+            : 'border-gray-300'
+        }`}>
+          {activeModule === 'qa' && (
+            <div className="w-2 h-2 bg-white rounded-full"></div>
+          )}
+        </div>
+        用户提问
+      </div>
+    </div>
+  );
 
   // 当切换会话时加载对应的消息
   useEffect(() => {
@@ -164,24 +294,6 @@ const App: React.FC = () => {
       await extractFromMessages(messages);
     }
   }, [messages, hasValidDesign, extractFromMessages]);
-
-  // 开始新对话
-  const handleNewChat = useCallback(() => {
-    createNewSession();
-    clear();
-    clearDesign();
-    resetDesignState();
-    setShowDownloadPanel(false);
-  }, [createNewSession, clear, clearDesign, resetDesignState]);
-
-  // 切换到历史对话
-  const handleSwitchSession = useCallback((sessionId: string) => {
-    switchSession(sessionId);
-    setShowDownloadPanel(false);
-    setIsMobileMenuOpen(false);
-    resetDesignState();
-    clearDesign();
-  }, [switchSession, resetDesignState, clearDesign]);
 
   // 删除对话
   const handleDeleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
@@ -373,25 +485,8 @@ const App: React.FC = () => {
             <CirclePlus size={18} className="mr-2 text-gray-500" /> 开启新对话
           </button>
 
-          {/* Menu Items */}
-          <div className="space-y-2 mb-8">
-            <button className="w-full flex items-center px-4 py-2 bg-[#E0E7FF] text-[#5B5FC7] rounded-lg text-sm font-medium transition-colors">
-              <LogIn size={18} className="mr-3" /> 信息输入
-            </button>
-            <button 
-              onClick={handleShowDownload}
-              className={`w-full flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
-                showDownloadPanel 
-                  ? 'bg-[#E0E7FF] text-[#5B5FC7] font-medium' 
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <Download size={18} className="mr-3" /> 方案下载
-            </button>
-            <button className="w-full flex items-center px-4 py-2 text-gray-500 rounded-lg text-sm hover:bg-gray-100 transition-colors">
-              <MessageSquare size={18} className="mr-3" /> 用户提问
-            </button>
-          </div>
+          {/* Menu Items - 进度指示器 */}
+          {renderMenuButtons()}
 
           {/* History */}
           <div className="flex-1 overflow-y-auto scrollbar-thin">
@@ -441,8 +536,9 @@ const App: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Mini Sidebar (Pro Mode) */
+        
         <div className="hidden md:flex w-16 bg-white border-r border-gray-200 flex-col items-center py-6 shrink-0 transition-all duration-300">
+        {/* Mini Sidebar (Pro Mode) */}
           <div className="mb-8">
             <Bot className="w-8 h-8 text-[#5B5FC7]" />
           </div>
@@ -458,19 +554,17 @@ const App: React.FC = () => {
             >
               <CirclePlus size={20} />
             </button>
-            <button className="text-[#5B5FC7] bg-[#EEF2FF] p-2 rounded-lg transition-colors" title="信息输入">
+            
+            {/* 进度指示器图标 - 不可点击 */}
+            <div className={`p-2 rounded-lg transition-colors ${activeModule === 'input' ? 'text-[#5B5FC7] bg-[#EEF2FF]' : 'text-gray-300'}`} title="信息输入">
               <LogIn size={20} />
-            </button>
-            <button 
-              onClick={handleShowDownload}
-              className="text-gray-400 hover:text-[#5B5FC7] transition-colors" 
-              title="方案下载"
-            >
+            </div>
+            <div className={`p-2 rounded-lg transition-colors ${activeModule === 'download' ? 'text-[#5B5FC7] bg-[#EEF2FF]' : 'text-gray-300'}`} title="方案下载">
               <Download size={20} />
-            </button>
-            <button className="text-gray-400 hover:text-[#5B5FC7] transition-colors" title="用户提问">
+            </div>
+            <div className={`p-2 rounded-lg transition-colors ${activeModule === 'qa' ? 'text-[#5B5FC7] bg-[#EEF2FF]' : 'text-gray-300'}`} title="用户提问">
               <MessageSquare size={20} />
-            </button>
+            </div>
           </div>
 
           <div className="mt-auto pt-6 border-t w-8 flex justify-center">
@@ -561,6 +655,7 @@ const App: React.FC = () => {
                 isExtracting={isExtracting}
                 hasValidDesign={hasValidDesign}
                 onClose={() => setShowDownloadPanel(false)} 
+                onConfirm={handleDownloadConfirmed}
               />
             </div>
           )}

@@ -5,7 +5,8 @@ import {
   Message, 
   checkDesignConfirmation, 
   checkUserWantsGeneration,
-  checkAskingForGeneration 
+  checkAskingForGeneration,
+  ChatMode 
 } from '../services/api';
 
 export interface ChatMessage {
@@ -21,8 +22,9 @@ export interface ChatMessage {
 
 export interface DesignState {
   isConfirmed: boolean;
-  isAskingForGeneration: boolean;  // AI 是否在询问生成方案
-  shouldShowDownload: boolean;      // 是否应该显示下载面板
+  isAskingForGeneration: boolean;
+  shouldShowDownload: boolean;
+  hasGeneratedDesign: boolean;  // 新增：是否已生成设计方案
   params: {
     inputVoltage?: string;
     inputVoltageMin?: string;
@@ -88,15 +90,17 @@ export function useChat() {
     isConfirmed: false,
     isAskingForGeneration: false,
     shouldShowDownload: false,
+    hasGeneratedDesign: false,
     params: {}
   });
   const [currentThinking, setCurrentThinking] = useState<string>('');
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
+  const [chatMode, setChatMode] = useState<ChatMode>('design');
 
   const generateId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // 流式发送消息
-  const send = useCallback(async (content: string) => {
+  const send = useCallback(async (content: string, designContext?: string) => {
     if (!content.trim() || isLoading) return;
 
     setError(null);
@@ -129,7 +133,6 @@ export function useChat() {
     const userWantsGeneration = designState.isAskingForGeneration && checkUserWantsGeneration(content);
     
     if (userWantsGeneration) {
-      // 用户确认要生成方案，设置标志
       setDesignState(prev => ({
         ...prev,
         shouldShowDownload: true,
@@ -180,23 +183,26 @@ export function useChat() {
           setIsLoading(false);
           setThinkingStartTime(null);
           
-          // 检查 AI 回复是否在询问生成方案
-          if (checkAskingForGeneration(finalContent)) {
-            setDesignState(prev => ({
-              ...prev,
-              isAskingForGeneration: true,
-              isConfirmed: true
-            }));
-          }
-          // 检查用户是否确认了参数（但还没询问生成）
-          else if (checkDesignConfirmation(content) && !designState.isAskingForGeneration) {
-            const params = extractDesignParams([...messages, userMessage]);
-            if (params.outputPower && (params.inputVoltage || params.inputVoltageMin)) {
+          // 只在设计模式下检查确认状态
+          if (chatMode === 'design') {
+            // 检查 AI 回复是否在询问生成方案
+            if (checkAskingForGeneration(finalContent)) {
               setDesignState(prev => ({
                 ...prev,
-                isConfirmed: true,
-                params
+                isAskingForGeneration: true,
+                isConfirmed: true
               }));
+            }
+            // 检查用户是否确认了参数（但还没询问生成）
+            else if (checkDesignConfirmation(content) && !designState.isAskingForGeneration) {
+              const params = extractDesignParams([...messages, userMessage]);
+              if (params.outputPower && (params.inputVoltage || params.inputVoltageMin)) {
+                setDesignState(prev => ({
+                  ...prev,
+                  isConfirmed: true,
+                  params
+                }));
+              }
             }
           }
         },
@@ -206,13 +212,13 @@ export function useChat() {
           setIsLoading(false);
           setThinkingStartTime(null);
         }
-      });
+      }, chatMode, designContext);
     } catch (err) {
       setError(err instanceof Error ? err.message : '发送消息失败');
       setIsLoading(false);
       setThinkingStartTime(null);
     }
-  }, [messages, isLoading, thinkingStartTime, designState.isAskingForGeneration]);
+  }, [messages, isLoading, thinkingStartTime, designState.isAskingForGeneration, chatMode]);
 
   // 清空对话
   const clear = useCallback(() => {
@@ -222,9 +228,11 @@ export function useChat() {
       isConfirmed: false, 
       isAskingForGeneration: false,
       shouldShowDownload: false,
+      hasGeneratedDesign: false,
       params: {} 
     });
     setCurrentThinking('');
+    setChatMode('design');
   }, []);
 
   // 重试
@@ -245,6 +253,7 @@ export function useChat() {
       isConfirmed: false, 
       isAskingForGeneration: false,
       shouldShowDownload: false,
+      hasGeneratedDesign: false,
       params: {} 
     });
   }, []);
@@ -257,17 +266,41 @@ export function useChat() {
     }));
   }, []);
 
+  // 标记已生成设计方案
+  const markDesignGenerated = useCallback(() => {
+    setDesignState(prev => ({
+      ...prev,
+      hasGeneratedDesign: true,
+      isConfirmed: false,
+      isAskingForGeneration: false
+    }));
+  }, []);
+
+  // 切换到问答模式
+  const switchToQAMode = useCallback(() => {
+    setChatMode('qa');
+  }, []);
+
+  // 切换到设计模式
+  const switchToDesignMode = useCallback(() => {
+    setChatMode('design');
+  }, []);
+
   return {
     messages,
     isLoading,
     error,
     designState,
     currentThinking,
+    chatMode,
     send,
     clear,
     retry,
     setMessages,
     resetDesignState,
     clearShowDownload,
+    markDesignGenerated,
+    switchToQAMode,
+    switchToDesignMode,
   };
 }
