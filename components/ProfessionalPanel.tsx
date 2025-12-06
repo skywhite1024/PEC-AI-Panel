@@ -1,6 +1,342 @@
-import React, { useState } from 'react';
-import { ArrowLeftCircle } from 'lucide-react';
+// components/ProfessionalPanel.tsx
+import React, { useState, useCallback } from 'react';
+import { ArrowLeftCircle, X, ChevronRight, Lock, Check } from 'lucide-react';
 import { PecLogoIcon, ProInput, ProRangeInput, CustomPieChart } from './PanelComponents';
+
+// 拓扑选择选项
+type TopologyType = 'buck' | 'boost' | 'buck-boost';
+
+// 调制模式选项
+type ModulationType = 'CCM' | 'DCM' | 'BCM';
+
+// 半导体技术选项
+type SemiconductorTech = 'Si' | 'GaN' | 'SiC';
+
+// 磁芯材料选项
+type CoreMaterial = 'Ferrite' | 'PowderCore' | 'Amorphous';
+
+// 拓扑信息
+const topologyInfo: Record<TopologyType, { name: string; description: string; image: string }> = {
+  'buck': {
+    name: 'Buck (降压型转换器)',
+    description: '输出电压低于输入电压，适用于电压降压场景',
+    image: '/images/buck-topology.png'
+  },
+  'boost': {
+    name: 'Boost (升压型转换器)',
+    description: '输出电压高于输入电压，适用于电压升压场景',
+    image: '/images/boost-topology.png'
+  },
+  'buck-boost': {
+    name: 'Buck-Boost (升降压型转换器)',
+    description: '输出电压可高于或低于输入电压，适用于宽范围输入场景',
+    image: '/images/buck-boost-topology.png'
+  }
+};
+
+// 调制模式信息
+const modulationInfo: Record<ModulationType, { name: string; description: string }> = {
+  'CCM': {
+    name: 'CCM (连续导通模式)',
+    description: '电感电流始终大于零，适用于大功率应用'
+  },
+  'DCM': {
+    name: 'DCM (不连续导通模式)',
+    description: '电感电流在每个周期内会降到零，适用于轻载优化'
+  },
+  'BCM': {
+    name: 'BCM (临界导通模式)',
+    description: '电感电流刚好降到零时开始下一周期，效率与EMI平衡'
+  }
+};
+
+// 选择按钮组件
+interface SelectButtonProps {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const SelectButton: React.FC<SelectButtonProps> = ({ selected, onClick, children, className = '' }) => (
+  <button
+    onClick={onClick}
+    className={`
+      px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+      border-2 flex items-center justify-center gap-2
+      ${selected 
+        ? 'border-[#2F54EB] bg-[#EEF2FF] text-[#2F54EB] shadow-sm' 
+        : 'border-gray-200 bg-white text-gray-600 hover:border-[#2F54EB]/30 hover:bg-gray-50'
+      }
+      ${className}
+    `}
+  >
+    {selected && <Check size={14} className="text-[#2F54EB]" />}
+    {children}
+  </button>
+);
+
+// 多选按钮组件（用于技术选型）
+interface MultiSelectButtonProps {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+const MultiSelectButton: React.FC<MultiSelectButtonProps> = ({ selected, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`
+      px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
+      border flex items-center justify-center gap-1.5
+      ${selected 
+        ? 'border-[#2F54EB] bg-[#2F54EB] text-white' 
+        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-[#2F54EB]/50'
+      }
+    `}
+  >
+    {selected && <Check size={12} />}
+    {children}
+  </button>
+);
+
+// 设计面板组件
+interface DesignPanelProps {
+  onLockAndContinue: () => void;
+}
+
+const DesignPanel: React.FC<DesignPanelProps> = ({ onLockAndContinue }) => {
+  // 拓扑选择状态
+  const [selectedTopology, setSelectedTopology] = useState<TopologyType>('boost');
+  
+  // 调制模式状态
+  const [selectedModulation, setSelectedModulation] = useState<ModulationType>('CCM');
+  
+  // 半导体技术状态（多选）
+  const [selectedSemiconductors, setSelectedSemiconductors] = useState<SemiconductorTech[]>(['Si']);
+  
+  // 磁芯材料状态（多选）
+  const [selectedCoreMaterials, setSelectedCoreMaterials] = useState<CoreMaterial[]>(['Ferrite']);
+
+  // 切换半导体技术选择
+  const toggleSemiconductor = (tech: SemiconductorTech) => {
+    setSelectedSemiconductors(prev => {
+      if (prev.includes(tech)) {
+        // 至少保留一个选择
+        if (prev.length > 1) {
+          return prev.filter(t => t !== tech);
+        }
+        return prev;
+      }
+      return [...prev, tech];
+    });
+  };
+
+  // 切换磁芯材料选择
+  const toggleCoreMaterial = (material: CoreMaterial) => {
+    setSelectedCoreMaterials(prev => {
+      if (prev.includes(material)) {
+        // 至少保留一个选择
+        if (prev.length > 1) {
+          return prev.filter(m => m !== material);
+        }
+        return prev;
+      }
+      return [...prev, material];
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* 拓扑选择卡片 */}
+      <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-white/50">
+        <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">拓扑选择</h3>
+        <p className="text-xs text-gray-400 mb-5">选择变换器拓扑</p>
+
+        {/* 拓扑选择按钮 */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <SelectButton
+            selected={selectedTopology === 'buck'}
+            onClick={() => setSelectedTopology('buck')}
+          >
+            Buck
+          </SelectButton>
+          <SelectButton
+            selected={selectedTopology === 'boost'}
+            onClick={() => setSelectedTopology('boost')}
+          >
+            Boost
+          </SelectButton>
+          <SelectButton
+            selected={selectedTopology === 'buck-boost'}
+            onClick={() => setSelectedTopology('buck-boost')}
+          >
+            Buck-Boost
+          </SelectButton>
+        </div>
+
+        {/* 当前选择的拓扑信息 */}
+        <div className="bg-[#F8FAFC] rounded-xl p-4 border border-gray-100">
+          <div className="text-sm text-gray-600 mb-3">
+            您当前选择的变换器拓扑：
+            <span className="font-medium text-[#2F54EB] ml-1">
+              {topologyInfo[selectedTopology].name}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            {topologyInfo[selectedTopology].description}
+          </p>
+          
+          {/* 拓扑电路图 */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 flex items-center justify-center min-h-[180px]">
+            <img 
+              src={topologyInfo[selectedTopology].image}
+              alt={topologyInfo[selectedTopology].name}
+              className="max-w-full max-h-[160px] object-contain"
+              onError={(e) => {
+                // 图片加载失败时显示占位符
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                target.parentElement!.innerHTML = `
+                  <div class="text-center text-gray-400">
+                    <svg class="w-16 h-16 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                    <p class="text-sm">${topologyInfo[selectedTopology].name}</p>
+                    <p class="text-xs mt-1">电路图加载中...</p>
+                  </div>
+                `;
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 调制方案卡片 */}
+      <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-white/50">
+        <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">调制方案</h3>
+        <p className="text-xs text-gray-400 mb-5">选择调制与工作模式</p>
+
+        {/* 调制模式选择按钮 */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <SelectButton
+            selected={selectedModulation === 'CCM'}
+            onClick={() => setSelectedModulation('CCM')}
+          >
+            CCM
+          </SelectButton>
+          <SelectButton
+            selected={selectedModulation === 'DCM'}
+            onClick={() => setSelectedModulation('DCM')}
+          >
+            DCM
+          </SelectButton>
+          <SelectButton
+            selected={selectedModulation === 'BCM'}
+            onClick={() => setSelectedModulation('BCM')}
+          >
+            BCM
+          </SelectButton>
+        </div>
+
+        {/* 当前选择的调制模式说明 */}
+        <div className="bg-[#F8FAFC] rounded-lg p-3 border border-gray-100">
+          <div className="flex items-start space-x-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#2F54EB] mt-1.5 shrink-0"></div>
+            <div>
+              <span className="text-sm font-medium text-gray-700">
+                {modulationInfo[selectedModulation].name}
+              </span>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {modulationInfo[selectedModulation].description}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 关键技术选型卡片 */}
+      <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-white/50">
+        <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">关键技术选型</h3>
+        <p className="text-xs text-gray-400 mb-5">限定元器件技术范围（可选，可多选）</p>
+
+        <div className="space-y-5">
+          {/* 半导体技术 */}
+          <div>
+            <div className="text-sm text-gray-600 mb-3 font-medium">半导体技术</div>
+            <div className="flex flex-wrap gap-2">
+              <MultiSelectButton
+                selected={selectedSemiconductors.includes('Si')}
+                onClick={() => toggleSemiconductor('Si')}
+              >
+                Si (硅)
+              </MultiSelectButton>
+              <MultiSelectButton
+                selected={selectedSemiconductors.includes('GaN')}
+                onClick={() => toggleSemiconductor('GaN')}
+              >
+                GaN (氮化镓)
+              </MultiSelectButton>
+              <MultiSelectButton
+                selected={selectedSemiconductors.includes('SiC')}
+                onClick={() => toggleSemiconductor('SiC')}
+              >
+                SiC (碳化硅)
+              </MultiSelectButton>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              已选择: {selectedSemiconductors.map(s => 
+                s === 'Si' ? '硅' : s === 'GaN' ? '氮化镓' : '碳化硅'
+              ).join('、')}
+            </p>
+          </div>
+
+          {/* 磁芯材料 */}
+          <div>
+            <div className="text-sm text-gray-600 mb-3 font-medium">磁芯材料 (主电感)</div>
+            <div className="flex flex-wrap gap-2">
+              <MultiSelectButton
+                selected={selectedCoreMaterials.includes('Ferrite')}
+                onClick={() => toggleCoreMaterial('Ferrite')}
+              >
+                Ferrite (铁氧体)
+              </MultiSelectButton>
+              <MultiSelectButton
+                selected={selectedCoreMaterials.includes('PowderCore')}
+                onClick={() => toggleCoreMaterial('PowderCore')}
+              >
+                Powder Core (磁粉芯)
+              </MultiSelectButton>
+              <MultiSelectButton
+                selected={selectedCoreMaterials.includes('Amorphous')}
+                onClick={() => toggleCoreMaterial('Amorphous')}
+              >
+                Amorphous (非晶)
+              </MultiSelectButton>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              已选择: {selectedCoreMaterials.map(m => 
+                m === 'Ferrite' ? '铁氧体' : m === 'PowderCore' ? '磁粉芯' : '非晶'
+              ).join('、')}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 锁定方案并继续按钮 */}
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={onLockAndContinue}
+          className="flex items-center px-6 py-3 bg-gradient-to-r from-[#2F54EB] to-[#5B5FC7] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-md"
+        >
+          <Lock size={16} className="mr-2" />
+          锁定方案并继续
+          <ChevronRight size={16} className="ml-1" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 interface ProfessionalPanelProps {
   onClose?: () => void;
