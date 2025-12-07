@@ -18,8 +18,8 @@ export interface StreamCallbacks {
 // 魔塔社区 API 配置
 const API_KEY = 'ms-88261760-4c02-4a0d-99ac-635693f9bacf';
 const API_URL = 'https://api-inference.modelscope.cn/v1/chat/completions';
-// const MODEL = 'deepseek-ai/DeepSeek-V3.2-Exp';
-const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
+const MODEL = 'deepseek-ai/DeepSeek-V3.2-Exp';
+// const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
 
 // 设计引导系统提示词（信息输入模式）
 const DESIGN_GUIDE_PROMPT = `你是 PEC-AI，一个专业的电力电子变换器设计助手。你的任务是通过友好的多轮对话，引导用户完善设计需求。

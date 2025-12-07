@@ -731,9 +731,9 @@ const App: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
                 {[
                   '导师让我做一个500W升压电路，从哪入手？',
-                  '参照主流方案，设计一个40kW三相光伏逆变器',
+                  '电池要求1kW，选什么拓扑？',
                   '老板要求48V转100V成本最低，选什么拓扑？',
-                  '推荐一个10kW光伏逆变器方案'
+                  '设计一个效率优先的Boost电路'
                 ].map((suggestion, idx) => (
                   <button
                     key={idx}

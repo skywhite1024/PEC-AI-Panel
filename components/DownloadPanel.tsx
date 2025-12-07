@@ -638,7 +638,7 @@ const DownloadPanel: React.FC<DownloadPanelProps> = ({
               icon={<FileCode size={16} />}
               title="性能仿真模型"
               description="预配置的仿真模型文件"
-              onClick={() => alert('仿真模型功能开发中...')}
+              onClick={() => alert('抱歉，仿真文件当前设备不支持...')}
             />
           </Section>
         </div>
