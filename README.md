@@ -1,20 +1,271 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+ <div align="center">
+
+**基于 AI 的电力电子变换器自动化设计系统**
+
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## 📖 项目简介
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Vl-uJzfQ1nS9_lsdIjK4N4cx7fp-8W7D
+PEC-AI（Power Electronics Converter - AI）是一个面向电力电子工程师的智能设计辅助平台。通过自然语言对话交互，用户无需掌握复杂的参数配置，即可快速完成 DC-DC 变换器的设计，获取包含完整物料清单（BOM）、设计报告和元器件选型说明的专业方案。
 
-## Run Locally
+### 核心特性
 
-**Prerequisites:**  Node.js
+| 特性                | 描述                                                               |
+| ------------------- | ------------------------------------------------------------------ |
+| 🤖 **AI 对话引导**  | 通过多轮智能对话收集设计需求，自动解析拓扑意图、电压等级、优化偏好 |
+| ⚡ **多目标优化**   | 支持效率优先、成本优先、体积优先或均衡设计的帕累托优化             |
+| 📊 **专业报告生成** | 一键生成 BOM 清单、设计报告、半导体/电感/电容选型报告（PDF/CSV）   |
+| 💬 **方案问答**     | 设计完成后进入问答模式，解答控制实现、元器件替换、PCB 布局等问题   |
+| 🎨 **双模式界面**   | 普通模式（AI 引导）与专业模式（完全参数控制）自由切换              |
 
+---
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🏗️ 项目结构
+
+```
+PEC-AI-Panel/
+├── App.tsx                    # 主应用组件，管理对话流程与界面状态
+├── index.tsx                  # 应用入口
+├── index.html                 # HTML 模板
+├── vite.config.ts             # Vite 构建配置
+├── tsconfig.json              # TypeScript 配置
+├── package.json               # 依赖管理
+│
+├── components/                # UI 组件
+│   ├── DownloadPanel.tsx      # 方案下载面板（生成进度、文件下载）
+│   ├── ProfessionalPanel.tsx  # 专业模式参数配置面板
+│   ├── PanelComponents.tsx    # 通用面板组件
+│   └── ThinkingBlock.tsx      # AI 思考过程展示组件
+│
+├── hooks/                     # 自定义 React Hooks
+│   ├── useChat.ts             # 对话状态管理（消息发送、流式响应）
+│   ├── useChatHistory.ts      # 对话历史持久化
+│   └── useDesignContext.ts    # 设计上下文提取与管理
+│
+├── services/                  # 业务逻辑服务
+│   ├── api.ts                 # AI API 调用（流式/非流式）、输入建议生成
+│   ├── designExtractor.ts     # 从对话中提取设计参数
+│   └── reportGenerator.ts     # PDF/CSV 报告生成
+│
+└── image/                     # 静态图片资源
+```
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Node.js >= 18.x
+- npm >= 9.x
+
+### 安装与运行
+
+```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd PEC-AI-Panel
+
+# 2. 安装依赖
+npm install
+
+# 3. 启动开发服务器
+npm run dev
+```
+
+启动后访问 `http://localhost:5173` 即可使用。
+
+### 构建生产版本
+
+```bash
+npm run build
+```
+
+构建产物位于 `dist/` 目录。
+
+---
+
+## 🔧 技术架构
+
+### 前端技术栈
+
+| 技术             | 用途     |
+| ---------------- | -------- |
+| **React 18**     | UI 框架  |
+| **TypeScript**   | 类型安全 |
+| **Vite**         | 构建工具 |
+| **TailwindCSS**  | 样式系统 |
+| **Lucide React** | 图标库   |
+| **jsPDF**        | PDF 生成 |
+
+### AI 服务
+
+项目通过 [ModelScope](https://api-inference.modelscope.cn) 调用大语言模型：
+
+```typescript
+// services/api.ts
+const API_URL = "https://api-inference.modelscope.cn/v1/chat/completions";
+const MODEL = "deepseek-ai/DeepSeek-V3.2-Exp";
+```
+
+支持的功能：
+
+- **流式响应**：实时展示 AI 回复，支持思考过程可视化
+- **双模式提示词**：设计引导模式 (`DESIGN_GUIDE_PROMPT`) 与问答模式 (`QA_MODE_PROMPT`)
+- **智能建议**：根据 AI 提问自动生成用户输入建议
+
+---
+
+## 📋 功能模块详解
+
+### 1. 信息输入模块
+
+通过 AI 对话收集设计参数：
+
+```
+对话流程：
+1. 拓扑类型 → Boost / Buck / Buck-Boost
+2. 输入电压 → 如 48V 或 36V-60V 范围
+3. 输出电压 → 如 100V
+4. 输出功率 → 如 500W
+5. 优化目标 → 效率优先 / 成本优先 / 均衡设计
+6. 参数确认 → AI 总结并等待用户确认
+```
+
+核心实现见 api.ts 中的 `sendMessageStream()` 函数。
+
+### 2. 方案生成模块
+
+参数确认后触发多目标优化，模拟 6 步生成过程：
+
+1. 半导体器件迭代优化
+2. 电感参数迭代优化
+3. 电容参数迭代优化
+4. 系统组合优化
+5. 帕累托筛选
+6. 报告生成
+
+实现见 DownloadPanel.tsx。
+
+### 3. 报告下载模块
+
+生成的可下载文件：
+
+| 文件           | 格式 | 内容                       |
+| -------------- | ---- | -------------------------- |
+| 物料清单 (BOM) | CSV  | 元器件型号、参数、价格     |
+| 设计报告       | PDF  | 系统规格、损耗分析、热分析 |
+| 半导体选型报告 | PDF  | MOSFET/二极管选型与热设计  |
+| 电感选型报告   | PDF  | 磁芯材料、绕组设计         |
+| 电容选型报告   | PDF  | 输入/输出电容选型          |
+
+实现见 reportGenerator.ts。
+
+### 4. 问答模块
+
+设计完成后自动切换至问答模式，可回答：
+
+- 控制实现（PWM 策略、PI 参数）
+- 元器件替换建议
+- 设计原理解释
+- PCB 布局与调试技巧
+
+---
+
+## 🎯 核心 API
+
+### 消息发送
+
+```typescript
+// 流式发送（推荐）
+import { sendMessageStream, Message, StreamCallbacks } from "./services/api";
+
+const messages: Message[] = [
+  { role: "user", content: "帮我设计一个48V转100V的500W升压电路" },
+];
+
+await sendMessageStream(messages, {
+  onThinking: (thinking) => console.log("思考中:", thinking),
+  onContent: (content) => console.log("回复:", content),
+  onDone: () => console.log("完成"),
+  onError: (error) => console.error("错误:", error),
+});
+```
+
+### 设计参数提取
+
+```typescript
+import { extractDesignFromChat } from "./services/designExtractor";
+
+const extracted = await extractDesignFromChat(messages);
+// 返回: { topology, inputVoltage, outputVoltage, outputPower, priority, ... }
+```
+
+### 报告生成
+
+```typescript
+import {
+  generateDesignReportPDF,
+  generateBOMCSV,
+} from "./services/reportGenerator";
+
+const pdfDoc = await generateDesignReportPDF(params, result);
+const csvContent = generateBOMCSV(params, result);
+```
+
+---
+
+## ⚙️ 配置说明
+
+### 环境变量
+
+在项目根目录创建 `.env.local` 文件：
+
+```env
+# AI API 配置（可选，默认使用内置密钥）
+VITE_API_KEY=your-modelscope-api-key
+```
+
+### TailwindCSS 主题
+
+自定义颜色定义在 index.html：
+
+```javascript
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: "#5B5FC7", // 主色调
+        panel: "#EEF2FF", // 面板背景
+        input: "#F3F6F8", // 输入框背景
+      },
+    },
+  },
+};
+```
+
+---
+
+## 📦 依赖说明
+
+### 生产依赖
+
+```json
+{
+  "react": "^18.x",
+  "react-dom": "^18.x",
+  "lucide-react": "^0.x" // 图标库
+}
+```
+
+### 开发依赖
+
+```json
+{
+  "typescript": "^5.x",
+  "vite": "^5.x",
+  "@types/react": "^18.x"
+}
+```
