@@ -702,19 +702,17 @@ const App: React.FC = () => {
 
           <div className="hidden md:block"></div>
 
-          {/* 
-            // 暂时注释掉专业模式按钮
-            {!isProMode && (
-              <button
-                onClick={() => setIsProMode(true)}
-                className="flex items-center bg-[#E0E7FF] text-[#5B5FC7] px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium hover:bg-[#d0daff] transition-colors z-10"
-              >
-                <ArrowRightCircle size={16} className="mr-1 md:mr-1.5" />
-                <span className="hidden sm:inline">专业模式</span>
-                <span className="sm:hidden">专业</span>
-              </button>
-            )}
-            */}
+          {/* 专业模式按钮 - 已恢复 */}
+          {!isProMode && (
+            <button
+              onClick={() => setIsProMode(true)}
+              className="flex items-center bg-[#E0E7FF] text-[#5B5FC7] px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium hover:bg-[#d0daff] transition-colors z-10"
+            >
+              <ArrowRightCircle size={16} className="mr-1 md:mr-1.5" />
+              <span className="hidden sm:inline">专业模式</span>
+              <span className="sm:hidden">专业</span>
+            </button>
+          )}
         </header>
 
         {/* Chat Messages */}
@@ -879,23 +877,21 @@ const App: React.FC = () => {
         </div>
       </div> 
 
-      {/* 
-        // 暂时注释掉专业模式面板
-        {isProMode && (
-          <div className="
-            fixed md:relative inset-0 md:inset-auto
-            w-full md:w-[55%] md:min-w-[500px] 
-            h-full 
-            bg-white md:bg-transparent
-            border-l-0 md:border-l border-gray-200 
-            shadow-none md:shadow-xl 
-            z-50 md:z-10
-            animate-in slide-in-from-right duration-300
-          ">
-            <ProfessionalPanel onClose={() => setIsProMode(false)} />
-          </div>
-        )}
-        */}
+      {/* 专业模式面板 - 已恢复 */}
+      {isProMode && (
+        <div className="
+          fixed md:relative inset-0 md:inset-auto
+          w-full md:w-[55%] md:min-w-[500px] 
+          h-full 
+          bg-white md:bg-transparent
+          border-l-0 md:border-l border-gray-200 
+          shadow-none md:shadow-xl 
+          z-50 md:z-10
+          animate-in slide-in-from-right duration-300
+        ">
+          <ProfessionalPanel onClose={() => setIsProMode(false)} />
+        </div>
+      )}
 
     </div>
   );
