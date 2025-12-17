@@ -24,6 +24,8 @@ const App: React.FC = () => {
   const [inputSuggestions, setInputSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [deleteModalSession, setDeleteModalSession] = useState<{ id: string; title: string } | null>(null);
+  const [personaKey, setPersonaKey] = useState<'pv' | 'pe' | 'emc'>('pv');
+  const [personaOpen, setPersonaOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -489,6 +491,18 @@ const App: React.FC = () => {
   // 获取分组的历史记录
   const { within7Days, within30Days, older } = getGroupedSessions();
 
+  const personaOptions: Record<typeof personaKey, { label: string }> = {
+    pv: {
+      label: 'AI-光伏板设计专家'
+    },
+    pe: {
+      label: 'AI-电力电子优化工程师'
+    },
+    emc: {
+      label: 'AI-电磁与热可靠性顾问'
+    }
+  };
+
   // 渲染历史记录项
   const renderSessionItem = (session: { id: string; title: string }) => (
     <div
@@ -640,10 +654,36 @@ const App: React.FC = () => {
             </svg>
           </div>
 
-          <button className="flex items-center justify-between w-full px-4 py-2 border rounded-lg bg-white mb-4 text-sm text-gray-600 shadow-sm hover:bg-gray-50 transition-colors">
-            <span>AI-光伏板设计专家</span>
-            <ChevronDown size={16} className="text-gray-400" />
-          </button>
+          <div className="relative mb-4">
+            <button
+              onClick={() => setPersonaOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-2 rounded-lg border border-gray-200 bg-white shadow-sm text-sm text-gray-700 hover:border-[#5B5FC7]/50 focus:border-[#5B5FC7] focus:ring-2 focus:ring-[#5B5FC7]/10 transition-all"
+            >
+              <span className="font-medium text-gray-800">{personaOptions[personaKey].label}</span>
+              <ChevronDown size={16} className={`text-gray-500 transition-transform ${personaOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {personaOpen && (
+              <div className="absolute z-20 mt-2 w-full bg-white rounded-xl border border-[#E5E9FF] shadow-lg overflow-hidden">
+                {Object.entries(personaOptions).map(([key, opt]) => (
+                  <button
+                    key={key}
+                    className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${
+                      key === personaKey
+                        ? 'bg-[#EEF2FF] text-[#2F54EB]'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                    onClick={() => {
+                      setPersonaKey(key as typeof personaKey);
+                      setPersonaOpen(false);
+                    }}
+                  >
+                    <span>{opt.label}</span>
+                    {key === personaKey && <CheckCircle size={14} className="text-[#2F54EB]" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button 
             onClick={handleNewChat}
