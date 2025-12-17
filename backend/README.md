@@ -1,0 +1,1 @@
+# FastAPI Backend\n\n最小鉴权服务：手机号+密码 / 手机号+短信验证码（占位）。\n\n## 运行\n\n`ash\npython -m venv .venv\n. .venv/Scripts/activate\npip install -r requirements.txt\nuvicorn main:app --reload\n`\n\n默认使用 SQLite，本地文件位于 backend/app.db。
