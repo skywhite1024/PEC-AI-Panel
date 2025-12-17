@@ -23,8 +23,11 @@ const App: React.FC = () => {
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
   const [inputSuggestions, setInputSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [deleteModalSession, setDeleteModalSession] = useState<{ id: string; title: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTriggeredRef = useRef(false);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
   // 当前激活的模块
   const [activeModule, setActiveModule] = useState<ActiveModule>('input');
@@ -148,6 +151,7 @@ const App: React.FC = () => {
     clear();
     clearDesign();
     resetDesignState();
+    setDeleteModalSession(null);
     setShowDownloadPanel(false);
     setActiveModule('input');
     setInputSuggestions([]); // 清空建议
@@ -161,6 +165,7 @@ const App: React.FC = () => {
     setIsMobileMenuOpen(false);
     resetDesignState();
     clearDesign();
+    setDeleteModalSession(null);
     setActiveModule('input');
     setInputSuggestions([]); // 清空建议
     setShowSuggestions(false);
@@ -402,13 +407,56 @@ const App: React.FC = () => {
     }
   }, [messages, hasValidDesign, extractFromMessages]);
 
-  // 删除对话
-  const handleDeleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
+  // 删除对话 - 弹窗确认
+  const handleAskDeleteSession = useCallback((session: { id: string; title: string }, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('确定要删除这个对话吗？')) {
-      deleteSession(sessionId);
+    setDeleteModalSession(session);
+  }, []);
+
+  const handleDeleteSession = useCallback(() => {
+    if (deleteModalSession) {
+      deleteSession(deleteModalSession.id);
+      setDeleteModalSession(null);
     }
-  }, [deleteSession]);
+  }, [deleteModalSession, deleteSession]);
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteModalSession(null);
+  }, []);
+
+  // 触控长按删除 - 辅助方法
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleSessionPointerDown = useCallback((session: { id: string; title: string }, e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') {
+      clearLongPressTimer();
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTriggeredRef.current = true;
+        setDeleteModalSession(session);
+      }, 600);
+    }
+  }, [clearLongPressTimer]);
+
+  const handleSessionPointerUp = useCallback((sessionId: string, e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') {
+      clearLongPressTimer();
+      if (longPressTriggeredRef.current) {
+        longPressTriggeredRef.current = false;
+        return; // 长按已触发删除，不再切换会话
+      }
+    }
+    handleSwitchSession(sessionId);
+  }, [clearLongPressTimer, handleSwitchSession]);
+
+  const handleSessionPointerLeave = useCallback(() => {
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
+  }, [clearLongPressTimer]);
 
   // 发送消息
   const handleSend = async () => {
@@ -450,15 +498,25 @@ const App: React.FC = () => {
           ? 'bg-[#E0E7FF] text-[#5B5FC7]'
           : 'hover:bg-gray-100 text-gray-600'
       }`}
-      onClick={() => handleSwitchSession(session.id)}
+      onClick={() => {
+        if (longPressTriggeredRef.current) {
+          longPressTriggeredRef.current = false;
+          return;
+        }
+        handleSwitchSession(session.id);
+      }}
+      onPointerDown={(e) => handleSessionPointerDown(session, e)}
+      onPointerUp={(e) => handleSessionPointerUp(session.id, e)}
+      onPointerLeave={handleSessionPointerLeave}
     >
       <p className="truncate flex-1 text-sm">{session.title}</p>
       <button
-        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
-        onClick={(e) => handleDeleteSession(session.id, e)}
+        className="opacity-0 group-hover:opacity-100 flex items-center px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-[#5B5FC7] hover:bg-[#EEF2FF] border border-transparent hover:border-[#E0E7FF] transition-all"
+        onClick={(e) => handleAskDeleteSession(session, e)}
         title="删除对话"
       >
-        <Trash2 size={14} />
+        <Trash2 size={14} className="mr-1" />
+        <span className="hidden sm:inline">删除</span>
       </button>
     </div>
   );
@@ -890,6 +948,32 @@ const App: React.FC = () => {
           animate-in slide-in-from-right duration-300
         ">
           <ProfessionalPanel onClose={() => setIsProMode(false)} />
+        </div>
+      )}
+
+      {/* 删除对话确认弹窗 */}
+      {deleteModalSession && (
+        <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E9FF] max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">要删除对话吗？</h3>
+            <p className="text-sm text-gray-700 leading-relaxed mb-6">
+              确定删除「{deleteModalSession.title || '未命名对话'}」？该操作无法恢复。
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleCancelDelete}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[#5B5FC7] bg-white border border-[#DCE4FF] hover:bg-[#EEF2FF] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDeleteSession}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-[#2F54EB] to-[#5B5FC7] hover:opacity-90 transition-opacity shadow-sm"
+              >
+                删除
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
