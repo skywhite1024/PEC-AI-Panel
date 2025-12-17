@@ -1,6 +1,6 @@
 // components/ProfessionalPanel.tsx
 import React, { useState, useCallback } from 'react';
-import { ArrowLeftCircle, X, ChevronRight, Lock, Check } from 'lucide-react';
+import { ArrowLeftCircle, X, ChevronRight, Lock, Check, Pause, Square } from 'lucide-react';
 import { PecLogoIcon, ProInput, ProRangeInput, CustomPieChart } from './PanelComponents';
 
 // 拓扑选择选项
@@ -334,9 +334,38 @@ const DesignPanel: React.FC<DesignPanelProps> = ({ onLockAndContinue }) => {
 
 interface ProfessionalPanelProps {
   onClose?: () => void;
+  // 预留实时计算相关接口，后续可由上层传入真实数据
+  progress?: number; // 0-100 总进度
+  currentTopology?: string;
+  currentMode?: string;
+  currentSweepIndex?: number;
+  totalSweepCount?: number;
+  currentFreq?: string;
+  currentInductance?: string;
+  elapsed?: string;
+  eta?: string;
+  foundCount?: number;
+  logs?: string[];
+  onPause?: () => void;
+  onStop?: () => void;
 }
 
-const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
+const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({
+  onClose,
+  progress = 35,
+  currentTopology = 'Boost',
+  currentMode = 'CCM',
+  currentSweepIndex = 18,
+  totalSweepCount = 48,
+  currentFreq = '150.0 kHz',
+  currentInductance = '20.0 µH',
+  elapsed = '00:02:15',
+  eta = '00:04:30',
+  foundCount = 112,
+  logs = [],
+  onPause,
+  onStop,
+}) => {
   const [activeTab, setActiveTab] = useState<'params' | 'design' | 'calc'>('design');
 
   // Form State
@@ -774,10 +803,117 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
           /* 设计方案内容 */
           <DesignPanel onLockAndContinue={() => {}} />
         ) : (
-          /* 实时计算内容 - 暂时为空 */
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-white/50">
-            <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">实时计算</h3>
-            <p className="text-xs text-gray-400 mb-5">实时计算功能开发中...</p>
+          /* 实时计算内容 */
+          <div className="space-y-4">
+            {/* 进度与控制 */}
+            <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-white/50">
+              <h3 className="text-[#2F54EB] font-medium text-[15px] mb-3">进度与控制</h3>
+
+              <div className="space-y-3">
+                {/* 总进度 */}
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>总进度</span>
+                  <span className="text-[#2F54EB] font-medium">{progress}%</span>
+                </div>
+                <div className="w-full h-3 bg-[#E8EDFF] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#5B5FC7] to-[#2F54EB] rounded-full transition-all"
+                    style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+                  />
+                </div>
+
+                {/* 当前任务状态 + 控制按钮 */}
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr,180px] gap-4">
+                  <div className="space-y-3">
+                    <div className="bg-[#F6F8FF] border border-[#E1E6FF] rounded-xl p-3 text-sm text-gray-700 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="text-gray-500 text-xs">当前拓扑</div>
+                        <div className="font-medium text-gray-800">
+                          {currentTopology} ({currentMode})
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          正在处理全局组合 ({currentSweepIndex} / {totalSweepCount})
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-600 whitespace-nowrap md:text-right">
+                        f_sw = {currentFreq}, L = {currentInductance}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#F6F8FF] border border-[#E1E6FF] rounded-xl p-3 text-sm text-gray-700 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="flex items-center justify-between md:block">
+                        <div className="text-xs text-gray-500 mb-1">已用时</div>
+                        <div className="font-medium">{elapsed}</div>
+                      </div>
+                      <div className="flex items-center justify-between md:block">
+                        <div className="text-xs text-gray-500 mb-1">预计剩余</div>
+                        <div className="font-medium">{eta}</div>
+                      </div>
+                      <div className="flex items-center justify-between md:block">
+                        <div className="text-xs text-gray-500 mb-1">已发现帕累托最优解</div>
+                        <div className="font-medium">{foundCount}个</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex lg:flex-col items-center lg:items-stretch gap-3 justify-center">
+                    <button
+                      onClick={onPause}
+                      className="flex items-center justify-center w-full lg:w-auto lg:flex-1 px-4 py-3 bg-white border border-[#2F54EB] text-[#2F54EB] rounded-xl font-medium hover:bg-[#EEF2FF] transition-colors"
+                    >
+                      <Pause className="w-4 h-4 mr-2" />
+                      暂停
+                    </button>
+                    <button
+                      onClick={onStop}
+                      className="flex items-center justify-center w-full lg:w-auto lg:flex-1 px-4 py-3 bg-gradient-to-r from-[#2F54EB] to-[#5B5FC7] text-white rounded-xl font-medium shadow-sm hover:opacity-90 transition-opacity"
+                    >
+                      <Square className="w-4 h-4 mr-2" />
+                      停止
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 日志与帕累托图 */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {/* 计算日志 */}
+              <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-white/50">
+                <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">计算日志</h3>
+                <p className="text-xs text-gray-400 mb-4">详细计算日志（实时刷新）</p>
+                <div className="bg-[#F6F8FF] border border-[#E1E6FF] rounded-xl p-3 h-64 overflow-auto text-xs text-gray-700 leading-relaxed whitespace-pre-line">
+                  {logs.length > 0 ? (
+                    logs.map((line, idx) => <div key={idx}>{line}</div>)
+                  ) : (
+                    <div className="space-y-1">
+                      <div>20:35:10 [INFO] — 开始处理组合；f_sw=150kHz, L=20µH</div>
+                      <div>20:35:10 [INFO] — 行为选择：调整电磁建模权重...</div>
+                      <div>20:35:11 [INFO] — 行为结束：搜索稳定工况... 完成。</div>
+                      <div>20:35:11 [INFO] — 启动局部最优优化...</div>
+                      <div>20:35:12 [INFO] — [热约束] 找到3/20个候选解。</div>
+                      <div>20:35:13 [INFO] — [磁件] 找到7个候选解。</div>
+                      <div>20:35:19 [INFO] — [电容] 找到15个候选解。</div>
+                      <div>20:35:21 [INFO] — 系统提示：在当前组合下发现 4 个新的全局托最优解。</div>
+                      <div>…</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 实时帕累托前沿图 */}
+              <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-white/50">
+                <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">实时帕累托前沿图</h3>
+                <p className="text-xs text-gray-400 mb-4">帕累托前沿构建过程</p>
+                <div className="bg-[#F6F8FF] border border-[#E1E6FF] rounded-xl p-3 h-64 flex items-center justify-center">
+                  <div className="text-center text-xs text-gray-500">
+                    <div className="text-sm font-medium text-gray-700 mb-2">图表占位</div>
+                    <p>预留 3D/2D 帕累托点云渲染区域</p>
+                    <p className="mt-1 text-[11px] text-gray-400">（后续可接入 WebGL / Canvas / ECharts）</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
