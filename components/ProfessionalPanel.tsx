@@ -521,11 +521,11 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
               <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">系统规格</h3>
               <p className="text-xs text-gray-400 mb-4 md:mb-5">核心电气规格</p>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-[1.05fr,1fr] items-start gap-6 md:gap-8">
                 {/* Left Column: Basic Inputs */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">输入电压</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-600 text-sm w-24">输入电压</span>
                     <ProInput 
                       value={formData.inputVoltage} 
                       unit="V" 
@@ -535,8 +535,8 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       error={getError('inputVoltage')}
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">输出电压</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-600 text-sm w-24">输出电压</span>
                     <ProInput 
                       value={formData.outputVoltage} 
                       unit="V" 
@@ -546,8 +546,8 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       error={getError('outputVoltage')}
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">输出功率</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-600 text-sm w-24">输出功率</span>
                     <ProInput 
                       value={formData.outputPower} 
                       unit="W" 
@@ -560,32 +560,34 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                 </div>
 
                 {/* Right Column: Range Inputs */}
-                <div className="space-y-3">
-                  <div className="text-xs text-gray-500 mb-2 font-medium">最差工况搜索范围</div>
-                  <ProRangeInput 
-                    label="输入电压范围"
-                    min={formData.vInMin}
-                    max={formData.vInMax}
-                    points={formData.vInPoints}
-                    unit="V"
-                    onMinChange={(v) => handleChange('vInMin', v)}
-                    onMaxChange={(v) => handleChange('vInMax', v)}
-                    onPointsChange={(v) => handleChange('vInPoints', v)}
-                    onBlur={rangeBlur('vInMin', 'vInMax', 'vInPoints')}
-                    errors={{ min: getError('vInMin'), max: getError('vInMax'), points: getError('vInPoints') }}
-                  />
-                  <ProRangeInput 
-                    label="输出功率范围"
-                    min={formData.pOutMin}
-                    max={formData.pOutMax}
-                    points={formData.pOutPoints}
-                    unit="W" 
-                    onMinChange={(v) => handleChange('pOutMin', v)}
-                    onMaxChange={(v) => handleChange('pOutMax', v)}
-                    onPointsChange={(v) => handleChange('pOutPoints', v)}
-                    onBlur={rangeBlur('pOutMin', 'pOutMax', 'pOutPoints')}
-                    errors={{ min: getError('pOutMin'), max: getError('pOutMax'), points: getError('pOutPoints') }}
-                  />
+                <div className="space-y-4 lg:min-w-[420px]">
+                  <div className="text-xs text-gray-500 font-medium">最差工况搜索范围</div>
+                  <div className="space-y-3">
+                    <ProRangeInput 
+                      label="输入电压范围"
+                      min={formData.vInMin}
+                      max={formData.vInMax}
+                      points={formData.vInPoints}
+                      unit="V"
+                      onMinChange={(v) => handleChange('vInMin', v)}
+                      onMaxChange={(v) => handleChange('vInMax', v)}
+                      onPointsChange={(v) => handleChange('vInPoints', v)}
+                      onBlur={rangeBlur('vInMin', 'vInMax', 'vInPoints')}
+                      errors={{ min: getError('vInMin'), max: getError('vInMax'), points: getError('vInPoints') }}
+                    />
+                    <ProRangeInput 
+                      label="输出功率范围"
+                      min={formData.pOutMin}
+                      max={formData.pOutMax}
+                      points={formData.pOutPoints}
+                      unit="W" 
+                      onMinChange={(v) => handleChange('pOutMin', v)}
+                      onMaxChange={(v) => handleChange('pOutMax', v)}
+                      onPointsChange={(v) => handleChange('pOutPoints', v)}
+                      onBlur={rangeBlur('pOutMin', 'pOutMax', 'pOutPoints')}
+                      errors={{ min: getError('pOutMin'), max: getError('pOutMax'), points: getError('pOutPoints') }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -667,7 +669,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                     <ProInput 
                       value={formData.freq} 
                       unit="Hz" 
-                      width="w-20" 
+                      width="w-24" 
                       onChange={(v) => handleChange('freq', v)}
                       onBlur={() => handleBlur('freq')}
                       error={getError('freq')}
@@ -678,7 +680,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                     <ProInput 
                       value={formData.inductance} 
                       unit="H" 
-                      width="w-20" 
+                      width="w-24" 
                       onChange={(v) => handleChange('inductance', v)}
                       onBlur={() => handleBlur('inductance')}
                       error={getError('inductance')}
@@ -703,7 +705,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       <ProInput 
                         value={formData.maxAmbTemp} 
                         unit="°C" 
-                        width="w-20" 
+                        width="w-24" 
                         onChange={(v) => handleChange('maxAmbTemp', v)}
                         onBlur={() => handleBlur('maxAmbTemp')}
                         error={getError('maxAmbTemp')}
@@ -714,7 +716,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       <ProInput 
                         value={formData.maxJuncTemp} 
                         unit="°C" 
-                        width="w-20" 
+                        width="w-24" 
                         onChange={(v) => handleChange('maxJuncTemp', v)}
                         onBlur={() => handleBlur('maxJuncTemp')}
                         error={getError('maxJuncTemp')}
@@ -725,7 +727,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       <ProInput 
                         value={formData.maxCoreTemp} 
                         unit="°C" 
-                        width="w-20" 
+                        width="w-24" 
                         onChange={(v) => handleChange('maxCoreTemp', v)}
                         onBlur={() => handleBlur('maxCoreTemp')}
                         error={getError('maxCoreTemp')}
@@ -742,7 +744,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       <ProInput 
                         value={formData.ripple} 
                         unit="%" 
-                        width="w-20" 
+                        width="w-24" 
                         onChange={(v) => handleChange('ripple', v)}
                         onBlur={() => handleBlur('ripple')}
                         error={getError('ripple')}
@@ -758,7 +760,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
                       <ProInput 
                         value={formData.lRatio} 
                         unit="" 
-                        width="w-20" 
+                        width="w-24" 
                         onChange={(v) => handleChange('lRatio', v)}
                         onBlur={() => handleBlur('lRatio')}
                         error={getError('lRatio')}

@@ -42,13 +42,13 @@ export const ProInput: React.FC<ProInputProps> = ({
   // Default variant: bg-[#F3F6F8] (Grayish background, no border by default)
   const bgClass = variant === 'blue' 
     ? 'bg-[#F0F5FF] border border-[#D6E4FF]' 
-    : 'bg-[#F3F6F8] border border-transparent';
+    : 'bg-[#F7F9FF] border border-[#DCE4FF]';
 
   return (
     <div className={`flex items-center ${className}`}>
       {label && <span className="text-gray-500 text-sm mr-2 whitespace-nowrap">{label}</span>}
       <div 
-        className={`${bgClass} rounded-md flex items-center px-2 h-7 ${width} transition-colors ${
+        className={`${bgClass} rounded-md flex items-center px-2 h-8 ${width} transition-colors ${
           error 
             ? 'border-red-400 bg-red-50 ring-1 ring-red-200' 
             : 'hover:border-blue-200 focus-within:border-[#5B5FC7]/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#5B5FC7]/10'
@@ -61,12 +61,12 @@ export const ProInput: React.FC<ProInputProps> = ({
           onChange={(e) => onChange?.(e.target.value)}
           onBlur={onBlur}
           readOnly={!onChange}
-          className={`bg-transparent border-none outline-none w-full text-center text-xs font-medium p-0 placeholder-gray-400 ${
-            error ? 'text-red-700' : 'text-gray-700'
+          className={`bg-transparent border-none outline-none w-full text-center text-sm font-medium p-0 placeholder-gray-400 ${
+            error ? 'text-red-700' : 'text-gray-800'
           }`}
         />
       </div>
-      <span className="text-gray-500 text-xs ml-2 w-4">{unit || ' '}</span>
+      <span className="text-gray-500 text-sm ml-2 w-4 text-left">{unit || ' '}</span>
     </div>
   );
 };
@@ -92,39 +92,39 @@ export const ProRangeInput: React.FC<ProRangeInputProps> = ({
   return (
     <div className="flex flex-col py-0.5 space-y-2">
       <span className="text-gray-600 text-sm">{label}</span>
-      <div className="flex flex-wrap items-center text-xs gap-2">
+      <div className="grid grid-cols-[auto_auto_auto_auto_auto_auto] items-center gap-x-0.5 gap-y-2 text-sm md:flex md:flex-nowrap md:items-center md:gap-3">
         {/* Min */}
-        <div className="flex items-center">
-          <span className="text-gray-500 mr-2">Min</span>
+        <div className="flex items-center whitespace-nowrap">
+          <span className="text-gray-500 mr-0.5 w-9 text-left">Min</span>
           <ProInput 
             value={min} 
-            width="w-12" 
+            width="w-30 md:w-12" 
             onChange={onMinChange}
             onBlur={onBlur}
             error={errors?.min}
           />
-          <span className="text-gray-500 ml-1.5 w-3">{unit}</span>
+          <span className="text-gray-500 ml-0.5 w-9 text-left">{unit}</span>
         </div>
         
         {/* Max */}
-        <div className="flex items-center">
-          <span className="text-gray-500 mr-2">Max</span>
+        <div className="flex items-center whitespace-nowrap">
+          <span className="text-gray-500 mr-0.5 w-9 text-left">Max</span>
           <ProInput 
             value={max} 
-            width="w-12" 
+            width="w-30 md:w-12" 
             onChange={onMaxChange}
             onBlur={onBlur}
             error={errors?.max}
           />
-          <span className="text-gray-500 ml-1.5 w-3">{unit}</span>
+          <span className="text-gray-500 ml-0.5 w-9 text-left">{unit}</span>
         </div>
 
         {/* Points */}
-        <div className="flex items-center">
-          <span className="text-gray-500 mr-2">扫描点数</span>
+        <div className="flex items-center whitespace-nowrap">
+          <span className="text-gray-500 mr-0.5 w-16 text-right">扫描点数</span>
           <ProInput 
             value={points} 
-            width="w-10" 
+            width="w-12 md:w-10" 
             onChange={onPointsChange}
             onBlur={onBlur}
             error={errors?.points}
