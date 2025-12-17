@@ -20,17 +20,17 @@ const topologyInfo: Record<TopologyType, { name: string; description: string; im
   'buck': {
     name: 'Buck (降压型转换器)',
     description: '输出电压低于输入电压，适用于电压降压场景',
-    image: '/images/buck-topology.png'
+    image: '/image/buck-topology.png'
   },
   'boost': {
     name: 'Boost (升压型转换器)',
     description: '输出电压高于输入电压，适用于电压升压场景',
-    image: '/images/boost-topology.png'
+    image: '/image/boost-topology.png'
   },
   'buck-boost': {
     name: 'Buck-Boost (升降压型转换器)',
     description: '输出电压可高于或低于输入电压，适用于宽范围输入场景',
-    image: '/images/buck-boost-topology.png'
+    image: '/image/buck-boost-topology.png'
   }
 };
 
@@ -122,11 +122,8 @@ const DesignPanel: React.FC<DesignPanelProps> = ({ onLockAndContinue }) => {
   const toggleSemiconductor = (tech: SemiconductorTech) => {
     setSelectedSemiconductors(prev => {
       if (prev.includes(tech)) {
-        // 至少保留一个选择
-        if (prev.length > 1) {
-          return prev.filter(t => t !== tech);
-        }
-        return prev;
+        // 允许取消所有选择
+        return prev.filter(t => t !== tech);
       }
       return [...prev, tech];
     });
@@ -136,11 +133,8 @@ const DesignPanel: React.FC<DesignPanelProps> = ({ onLockAndContinue }) => {
   const toggleCoreMaterial = (material: CoreMaterial) => {
     setSelectedCoreMaterials(prev => {
       if (prev.includes(material)) {
-        // 至少保留一个选择
-        if (prev.length > 1) {
-          return prev.filter(m => m !== material);
-        }
-        return prev;
+        // 允许取消所有选择
+        return prev.filter(m => m !== material);
       }
       return [...prev, material];
     });
@@ -343,7 +337,7 @@ interface ProfessionalPanelProps {
 }
 
 const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'design' | 'calc'>('params');
+  const [activeTab, setActiveTab] = useState<'params' | 'design' | 'calc'>('design');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -373,7 +367,27 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
     lRatio: '0.75'
   });
 
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({
+    inputVoltage: false,
+    outputVoltage: false,
+    outputPower: false,
+    vInMin: false,
+    vInMax: false,
+    vInPoints: false,
+    pOutMin: false,
+    pOutMax: false,
+    pOutPoints: false,
+    effWeight: false,
+    costWeight: false,
+    volWeight: false,
+    freq: false,
+    inductance: false,
+    maxAmbTemp: false,
+    maxJuncTemp: false,
+    maxCoreTemp: false,
+    ripple: false,
+    lRatio: false
+  });
 
   // Validation Logic
   const validate = () => {
@@ -442,7 +456,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
     handleBlur(f1); handleBlur(f2); handleBlur(f3);
   };
 
-    return (
+  return (
     <div className="h-full flex flex-col bg-[#EEF2FF] border-l border-white/60">
       {/* --- Top Header Area --- */}
       <div className="px-4 md:px-6 py-4 flex items-center justify-between shrink-0">
@@ -460,33 +474,33 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
           <div className="flex bg-transparent space-x-1 md:space-x-2">
             <button
               onClick={() => setActiveTab('params')}
-              className={`px-2 md:px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-3 md:px-5 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === 'params' 
                   ? 'bg-white text-[#2F54EB] shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              参数
+              参数面板
             </button>
             <button
               onClick={() => setActiveTab('design')}
-              className={`px-2 md:px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-3 md:px-5 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === 'design' 
                   ? 'bg-white text-[#2F54EB] shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              设计
+              设计方案
             </button>
             <button
               onClick={() => setActiveTab('calc')}
-              className={`px-2 md:px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-3 md:px-5 py-1.5 rounded-full text-xs font-medium transition-all ${
                 activeTab === 'calc' 
                   ? 'bg-white text-[#2F54EB] shadow-sm' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              计算
+              实时计算
             </button>
           </div>
         </div>
@@ -499,258 +513,271 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({ onClose }) => {
 
       {/* --- Scrollable Content Area --- */}
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-6 scrollbar-thin space-y-4">
-        
-        {/* Card 1: System Specs */}
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-white/50">
-          <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">系统规格</h3>
-          <p className="text-xs text-gray-400 mb-4 md:mb-5">核心电气规格</p>
+        {activeTab === 'params' ? (
+          /* 参数面板内容 */
+          <>
+            {/* Card 1: System Specs */}
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-white/50">
+              <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">系统规格</h3>
+              <p className="text-xs text-gray-400 mb-4 md:mb-5">核心电气规格</p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            {/* Left Column: Basic Inputs */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">输入电压</span>
-                <ProInput 
-                  value={formData.inputVoltage} 
-                  unit="V" 
-                  width="w-16 md:w-20" 
-                  onChange={(v) => handleChange('inputVoltage', v)}
-                  onBlur={() => handleBlur('inputVoltage')}
-                  error={getError('inputVoltage')}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">输出电压</span>
-                <ProInput 
-                  value={formData.outputVoltage} 
-                  unit="V" 
-                  width="w-16 md:w-20" 
-                  onChange={(v) => handleChange('outputVoltage', v)}
-                  onBlur={() => handleBlur('outputVoltage')}
-                  error={getError('outputVoltage')}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">输出功率</span>
-                <ProInput 
-                  value={formData.outputPower} 
-                  unit="W" 
-                  width="w-16 md:w-20" 
-                  onChange={(v) => handleChange('outputPower', v)}
-                  onBlur={() => handleBlur('outputPower')}
-                  error={getError('outputPower')}
-                />
-              </div>
-            </div>
-
-            {/* Right Column: Range Inputs */}
-            <div className="space-y-3">
-              <div className="text-xs text-gray-500 mb-2 font-medium">最差工况搜索范围</div>
-              <ProRangeInput 
-                label="输入电压范围"
-                min={formData.vInMin}
-                max={formData.vInMax}
-                points={formData.vInPoints}
-                unit="V"
-                onMinChange={(v) => handleChange('vInMin', v)}
-                onMaxChange={(v) => handleChange('vInMax', v)}
-                onPointsChange={(v) => handleChange('vInPoints', v)}
-                onBlur={rangeBlur('vInMin', 'vInMax', 'vInPoints')}
-                errors={{ min: getError('vInMin'), max: getError('vInMax'), points: getError('vInPoints') }}
-              />
-              <ProRangeInput 
-                label="输出功率范围"
-                min={formData.pOutMin}
-                max={formData.pOutMax}
-                points={formData.pOutPoints}
-                unit="W" 
-                onMinChange={(v) => handleChange('pOutMin', v)}
-                onMaxChange={(v) => handleChange('pOutMax', v)}
-                onPointsChange={(v) => handleChange('pOutPoints', v)}
-                onBlur={rangeBlur('pOutMin', 'pOutMax', 'pOutPoints')}
-                errors={{ min: getError('pOutMin'), max: getError('pOutMax'), points: getError('pOutPoints') }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* 其余卡片保持类似的响应式修改... */}
-        {/* 将 p-6 改为 p-4 md:p-6 */}
-        {/* 将固定的 grid-cols-2 改为 grid-cols-1 lg:grid-cols-2 */}
-        {/* Row 2: Optimization & Global Vars */}
-        <div className="grid grid-cols-12 gap-4">
-          
-          {/* Card 2: Optimization Targets */}
-          <div className="col-span-12 xl:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-white/50">
-            <div className="flex items-center space-x-3 mb-6">
-              <h3 className="text-[#2F54EB] font-medium text-[15px]">优化目标</h3>
-              <span className="text-[10px] text-gray-300 transform translate-y-0.5">请输入0-100的数字，程序会自动进行归一化处理</span>
-            </div>
-
-            <div className="flex justify-between items-start">
-              {/* Left Side: Inputs */}
-              <div className="flex-1 pr-4">
-                 <div className="flex justify-between text-xs text-gray-400 mb-4 font-medium">
-                    <span>多目标优化权重</span>
-                 </div>
-                 
-                 <div className="space-y-3">
-                   <div className="flex items-center justify-between">
-                      <span className="text-gray-700 text-sm font-medium">效率</span>
-                      <ProInput 
-                        value={formData.effWeight} 
-                        width="w-24" 
-                        variant="blue" // Use Blue Variant
-                        onChange={(v) => handleChange('effWeight', v)}
-                        onBlur={() => handleBlur('effWeight')}
-                        error={getError('effWeight')}
-                      />
-                   </div>
-                   <div className="flex items-center justify-between">
-                      <span className="text-gray-700 text-sm font-medium">成本</span>
-                      <ProInput 
-                        value={formData.costWeight} 
-                        width="w-24" 
-                        variant="blue" // Use Blue Variant
-                        onChange={(v) => handleChange('costWeight', v)}
-                        onBlur={() => handleBlur('costWeight')}
-                        error={getError('costWeight')}
-                      />
-                   </div>
-                   <div className="flex items-center justify-between">
-                      <span className="text-gray-700 text-sm font-medium">体积</span>
-                      <ProInput 
-                        value={formData.volWeight} 
-                        width="w-24" 
-                        variant="blue" // Use Blue Variant
-                        onChange={(v) => handleChange('volWeight', v)}
-                        onBlur={() => handleBlur('volWeight')}
-                        error={getError('volWeight')}
-                      />
-                   </div>
-                 </div>
-              </div>
-
-              {/* Right Side: Chart */}
-              <div className="flex flex-col items-center w-28 pt-1">
-                 <span className="text-xs text-gray-400 mb-4 font-medium">权重分配</span>
-                 <CustomPieChart />
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Global Design Variables */}
-          <div className="col-span-12 xl:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-white/50">
-            <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">全局设计变量</h3>
-            <p className="text-xs text-gray-400 mb-6">全局变量迭代空间</p>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">开关频率</span>
-                <ProInput 
-                  value={formData.freq} 
-                  unit="Hz" 
-                  width="w-20" 
-                  onChange={(v) => handleChange('freq', v)}
-                  onBlur={() => handleBlur('freq')}
-                  error={getError('freq')}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">电感值</span>
-                <ProInput 
-                  value={formData.inductance} 
-                  unit="H" 
-                  width="w-20" 
-                  onChange={(v) => handleChange('inductance', v)}
-                  onBlur={() => handleBlur('inductance')}
-                  error={getError('inductance')}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Component Constraints */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-white/50">
-          <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">元器件约束</h3>
-          <p className="text-xs text-gray-400 mb-5">设计安全与性能边界</p>
-
-          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-x-12 gap-y-6">
-             {/* Left Column: Thermal */}
-             <div className="space-y-3">
-                <div className="text-xs text-gray-500 mb-2 font-medium">热约束</div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 text-sm">最高环境温度</span>
-                  <ProInput 
-                    value={formData.maxAmbTemp} 
-                    unit="°C" 
-                    width="w-20" 
-                    onChange={(v) => handleChange('maxAmbTemp', v)}
-                    onBlur={() => handleBlur('maxAmbTemp')}
-                    error={getError('maxAmbTemp')}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 text-sm">最高半导体结温</span>
-                  <ProInput 
-                    value={formData.maxJuncTemp} 
-                    unit="°C" 
-                    width="w-20" 
-                    onChange={(v) => handleChange('maxJuncTemp', v)}
-                    onBlur={() => handleBlur('maxJuncTemp')}
-                    error={getError('maxJuncTemp')}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 text-sm">最高磁芯温度</span>
-                  <ProInput 
-                    value={formData.maxCoreTemp} 
-                    unit="°C" 
-                    width="w-20" 
-                    onChange={(v) => handleChange('maxCoreTemp', v)}
-                    onBlur={() => handleBlur('maxCoreTemp')}
-                    error={getError('maxCoreTemp')}
-                  />
-                </div>
-             </div>
-
-             {/* Right Column: Electrical */}
-             <div className="space-y-3">
-                <div className="text-xs text-gray-500 mb-2 font-medium">电气约束</div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 text-sm">最大输出电压纹波</span>
-                  <ProInput 
-                    value={formData.ripple} 
-                    unit="%" 
-                    width="w-20" 
-                    onChange={(v) => handleChange('ripple', v)}
-                    onBlur={() => handleBlur('ripple')}
-                    error={getError('ripple')}
-                  />
-                </div>
-                
-                {/* Consolidated Constraint Item */}
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                     <span className="text-gray-600 text-sm">最小电感裕量 (防饱和)</span>
-                     <span className="text-[10px] text-gray-400 mt-0.5">L(I_peak) / L(0) 不低于</span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                {/* Left Column: Basic Inputs */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">输入电压</span>
+                    <ProInput 
+                      value={formData.inputVoltage} 
+                      unit="V" 
+                      width="w-16 md:w-20" 
+                      onChange={(v) => handleChange('inputVoltage', v)}
+                      onBlur={() => handleBlur('inputVoltage')}
+                      error={getError('inputVoltage')}
+                    />
                   </div>
-                  <ProInput 
-                    value={formData.lRatio} 
-                    unit="" 
-                    width="w-20" 
-                    onChange={(v) => handleChange('lRatio', v)}
-                    onBlur={() => handleBlur('lRatio')}
-                    error={getError('lRatio')}
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">输出电压</span>
+                    <ProInput 
+                      value={formData.outputVoltage} 
+                      unit="V" 
+                      width="w-16 md:w-20" 
+                      onChange={(v) => handleChange('outputVoltage', v)}
+                      onBlur={() => handleBlur('outputVoltage')}
+                      error={getError('outputVoltage')}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">输出功率</span>
+                    <ProInput 
+                      value={formData.outputPower} 
+                      unit="W" 
+                      width="w-16 md:w-20" 
+                      onChange={(v) => handleChange('outputPower', v)}
+                      onBlur={() => handleBlur('outputPower')}
+                      error={getError('outputPower')}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Range Inputs */}
+                <div className="space-y-3">
+                  <div className="text-xs text-gray-500 mb-2 font-medium">最差工况搜索范围</div>
+                  <ProRangeInput 
+                    label="输入电压范围"
+                    min={formData.vInMin}
+                    max={formData.vInMax}
+                    points={formData.vInPoints}
+                    unit="V"
+                    onMinChange={(v) => handleChange('vInMin', v)}
+                    onMaxChange={(v) => handleChange('vInMax', v)}
+                    onPointsChange={(v) => handleChange('vInPoints', v)}
+                    onBlur={rangeBlur('vInMin', 'vInMax', 'vInPoints')}
+                    errors={{ min: getError('vInMin'), max: getError('vInMax'), points: getError('vInPoints') }}
+                  />
+                  <ProRangeInput 
+                    label="输出功率范围"
+                    min={formData.pOutMin}
+                    max={formData.pOutMax}
+                    points={formData.pOutPoints}
+                    unit="W" 
+                    onMinChange={(v) => handleChange('pOutMin', v)}
+                    onMaxChange={(v) => handleChange('pOutMax', v)}
+                    onPointsChange={(v) => handleChange('pOutPoints', v)}
+                    onBlur={rangeBlur('pOutMin', 'pOutMax', 'pOutPoints')}
+                    errors={{ min: getError('pOutMin'), max: getError('pOutMax'), points: getError('pOutPoints') }}
                   />
                 </div>
-             </div>
-          </div>
-        </div>
+              </div>
+            </div>
 
+            {/* Row 2: Optimization & Global Vars */}
+            <div className="grid grid-cols-12 gap-4">
+              
+              {/* Card 2: Optimization Targets */}
+              <div className="col-span-12 xl:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-white/50">
+                <div className="flex items-center space-x-3 mb-6">
+                  <h3 className="text-[#2F54EB] font-medium text-[15px]">优化目标</h3>
+                  <span className="text-[10px] text-gray-300 transform translate-y-0.5">请输入0-100的数字，程序会自动进行归一化处理</span>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  {/* Left Side: Inputs */}
+                  <div className="flex-1 pr-4">
+                     <div className="flex justify-between text-xs text-gray-400 mb-4 font-medium">
+                        <span>多目标优化权重</span>
+                     </div>
+                     
+                     <div className="space-y-3 mt-4">
+                       <div className="flex items-center justify-between">
+                          <span className="text-gray-700 text-sm font-medium">效率</span>
+                          <ProInput 
+                            value={formData.effWeight} 
+                            width="w-24" 
+                            variant="blue" // Use Blue Variant
+                            onChange={(v) => handleChange('effWeight', v)}
+                            onBlur={() => handleBlur('effWeight')}
+                            error={getError('effWeight')}
+                          />
+                       </div>
+                       <div className="flex items-center justify-between">
+                          <span className="text-gray-700 text-sm font-medium">成本</span>
+                          <ProInput 
+                            value={formData.costWeight} 
+                            width="w-24" 
+                            variant="blue" // Use Blue Variant
+                            onChange={(v) => handleChange('costWeight', v)}
+                            onBlur={() => handleBlur('costWeight')}
+                            error={getError('costWeight')}
+                          />
+                       </div>
+                       <div className="flex items-center justify-between">
+                          <span className="text-gray-700 text-sm font-medium">体积</span>
+                          <ProInput 
+                            value={formData.volWeight} 
+                            width="w-24" 
+                            variant="blue" // Use Blue Variant
+                            onChange={(v) => handleChange('volWeight', v)}
+                            onBlur={() => handleBlur('volWeight')}
+                            error={getError('volWeight')}
+                          />
+                       </div>
+                     </div>
+                  </div>
+
+                  {/* Right Side: Chart */}
+                  <div className="flex flex-col items-center w-28 pt-1">
+                     <span className="text-xs text-gray-400 mb-4 font-medium">权重分配</span>
+                     <CustomPieChart 
+                       effWeight={formData.effWeight}
+                       costWeight={formData.costWeight}
+                       volWeight={formData.volWeight}
+                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Global Design Variables */}
+              <div className="col-span-12 xl:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-white/50">
+                <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">全局设计变量</h3>
+                <p className="text-xs text-gray-400 mb-6">全局变量迭代空间</p>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">开关频率</span>
+                    <ProInput 
+                      value={formData.freq} 
+                      unit="Hz" 
+                      width="w-20" 
+                      onChange={(v) => handleChange('freq', v)}
+                      onBlur={() => handleBlur('freq')}
+                      error={getError('freq')}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">电感值</span>
+                    <ProInput 
+                      value={formData.inductance} 
+                      unit="H" 
+                      width="w-20" 
+                      onChange={(v) => handleChange('inductance', v)}
+                      onBlur={() => handleBlur('inductance')}
+                      error={getError('inductance')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Component Constraints */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-white/50">
+              <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">元器件约束</h3>
+              <p className="text-xs text-gray-400 mb-5">设计安全与性能边界</p>
+
+              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-x-12 gap-y-6">
+                 {/* Left Column: Thermal */}
+                 <div className="space-y-3">
+                    <div className="text-xs text-gray-500 mb-2 font-medium">热约束</div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 text-sm">最高环境温度</span>
+                      <ProInput 
+                        value={formData.maxAmbTemp} 
+                        unit="°C" 
+                        width="w-20" 
+                        onChange={(v) => handleChange('maxAmbTemp', v)}
+                        onBlur={() => handleBlur('maxAmbTemp')}
+                        error={getError('maxAmbTemp')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 text-sm">最高半导体结温</span>
+                      <ProInput 
+                        value={formData.maxJuncTemp} 
+                        unit="°C" 
+                        width="w-20" 
+                        onChange={(v) => handleChange('maxJuncTemp', v)}
+                        onBlur={() => handleBlur('maxJuncTemp')}
+                        error={getError('maxJuncTemp')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 text-sm">最高磁芯温度</span>
+                      <ProInput 
+                        value={formData.maxCoreTemp} 
+                        unit="°C" 
+                        width="w-20" 
+                        onChange={(v) => handleChange('maxCoreTemp', v)}
+                        onBlur={() => handleBlur('maxCoreTemp')}
+                        error={getError('maxCoreTemp')}
+                      />
+                    </div>
+                 </div>
+
+                 {/* Right Column: Electrical */}
+                 <div className="space-y-3">
+                    <div className="text-xs text-gray-500 mb-2 font-medium">电气约束</div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 text-sm">最大输出电压纹波</span>
+                      <ProInput 
+                        value={formData.ripple} 
+                        unit="%" 
+                        width="w-20" 
+                        onChange={(v) => handleChange('ripple', v)}
+                        onBlur={() => handleBlur('ripple')}
+                        error={getError('ripple')}
+                      />
+                    </div>
+                    
+                    {/* Consolidated Constraint Item */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                         <span className="text-gray-600 text-sm">最小电感裕量 (防饱和)</span>
+                         <span className="text-[10px] text-gray-400 mt-0.5">L(I_peak) / L(0) 不低于</span>
+                      </div>
+                      <ProInput 
+                        value={formData.lRatio} 
+                        unit="" 
+                        width="w-20" 
+                        onChange={(v) => handleChange('lRatio', v)}
+                        onBlur={() => handleBlur('lRatio')}
+                        error={getError('lRatio')}
+                      />
+                    </div>
+                 </div>
+              </div>
+            </div>
+          </>
+        ) : activeTab === 'design' ? (
+          /* 设计方案内容 */
+          <DesignPanel onLockAndContinue={() => {}} />
+        ) : (
+          /* 实时计算内容 - 暂时为空 */
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-white/50">
+            <h3 className="text-[#2F54EB] font-medium text-[15px] mb-1">实时计算</h3>
+            <p className="text-xs text-gray-400 mb-5">实时计算功能开发中...</p>
+          </div>
+        )}
       </div>
     </div>
   );

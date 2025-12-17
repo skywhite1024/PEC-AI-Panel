@@ -702,7 +702,7 @@ const App: React.FC = () => {
 
           <div className="hidden md:block"></div>
 
-          {/* 专业模式按钮 - 已恢复 */}
+          {/* 专业模式按钮 */}
           {!isProMode && (
             <button
               onClick={() => setIsProMode(true)}
@@ -877,7 +877,7 @@ const App: React.FC = () => {
         </div>
       </div> 
 
-      {/* 专业模式面板 - 已恢复 */}
+      {/* 专业模式面板 */}
       {isProMode && (
         <div className="
           fixed md:relative inset-0 md:inset-auto

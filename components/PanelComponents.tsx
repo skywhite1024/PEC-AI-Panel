@@ -66,7 +66,7 @@ export const ProInput: React.FC<ProInputProps> = ({
           }`}
         />
       </div>
-      {unit && <span className="text-gray-500 text-xs ml-2 w-4">{unit}</span>}
+      <span className="text-gray-500 text-xs ml-2 w-4">{unit || ' '}</span>
     </div>
   );
 };
@@ -136,45 +136,89 @@ export const ProRangeInput: React.FC<ProRangeInputProps> = ({
 };
 // --- Charts ---
 
-export const CustomPieChart: React.FC = () => {
+interface CustomPieChartProps {
+  effWeight: string | number;
+  costWeight: string | number;
+  volWeight: string | number;
+}
+
+export const CustomPieChart: React.FC<CustomPieChartProps> = ({ 
+  effWeight, 
+  costWeight, 
+  volWeight 
+}) => {
+  const eff = parseFloat(effWeight.toString()) || 0;
+  const cost = parseFloat(costWeight.toString()) || 0;
+  const vol = parseFloat(volWeight.toString()) || 0;
+  
+  const total = eff + cost + vol;
+  
+  const volAngle = total > 0 ? (vol / total) * 360 : 0;
+  const costAngle = total > 0 ? (cost / total) * 360 : 0;
+  const effAngle = total > 0 ? (eff / total) * 360 : 0;
+  
+  const volStartAngle = 0;
+  const volEndAngle = volAngle;
+  const costStartAngle = volEndAngle;
+  const costEndAngle = volEndAngle + costAngle;
+  const effStartAngle = costEndAngle;
+  const effEndAngle = costEndAngle + effAngle;
+  
+  const cx = 50;
+  const cy = 50;
+  const r = 45;
+  
+  const degToRad = (deg: number) => deg * Math.PI / 180;
+  
+  const getPoint = (angle: number) => {
+    const rad = degToRad(angle);
+    return {
+      x: cx + r * Math.cos(rad),
+      y: cy + r * Math.sin(rad)
+    };
+  };
+  
+  const getSectorPath = (startAngle: number, endAngle: number) => {
+    const start = getPoint(startAngle);
+    const end = getPoint(endAngle);
+    const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+    const sweepFlag = 1;
+    
+    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y} Z`;
+  };
+  
   return (
-    <div className="relative w-28 h-28 flex items-center justify-center">
-      {/* 
-        SVG Rotation logic:
-        -rotate-90 puts 0 degrees at 12 o'clock.
-        Circumference ~314.
-        Each 120deg slice ~104.7 length.
-        
-        Sectors:
-        1. Volume (Grey): 0deg to 120deg (Top Right)
-        2. Cost (Light Purple): 120deg to 240deg (Bottom)
-        3. Efficiency (Blue): 240deg to 360deg (Top Left)
-      */}
-      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-        
-        {/* 1. Grey (Volume) - 0 to 120 deg */}
-        <circle cx="50" cy="50" r="50" fill="#BFBFBF" stroke="white" strokeWidth="1" 
-                strokeDasharray="104.7 314" strokeDashoffset="0" />
-        
-        {/* 2. Light Purple (Cost) - 120 to 240 deg */}
-        <circle cx="50" cy="50" r="50" fill="#B3C6FF" stroke="white" strokeWidth="1" 
-                strokeDasharray="104.7 314" strokeDashoffset="-104.7" />
-        
-        {/* 3. Blue (Efficiency) - 240 to 360 deg */}
-        <circle cx="50" cy="50" r="50" fill="#2F54EB" stroke="white" strokeWidth="1" 
-                 strokeDasharray="104.7 314" strokeDashoffset="-209.4" />
+    <div className="relative w-28 flex flex-col items-center">
+      <svg viewBox="0 0 100 100" className="w-full h-28 -rotate-90">
+        <path d={getSectorPath(volStartAngle, volEndAngle)} fill="#BFBFBF" />
+        <path d={getSectorPath(costStartAngle, costEndAngle)} fill="#B3C6FF" />
+        <path d={getSectorPath(effStartAngle, effEndAngle)} fill="#2F54EB" />
       </svg>
       
-      {/* Labels positioned absolutely over the slices */}
-      <div className="absolute inset-0 pointer-events-none text-[10px] font-medium tracking-wide">
-        {/* Volume (Grey) - Top Right */}
-        <span className="absolute top-[32%] right-[18%] text-white">体积</span>
+      <div className="w-full mt-2 space-y-1 text-[10px]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2 h-2 rounded-full bg-[#2F54EB]"></div>
+            <span className="text-gray-600">效率</span>
+          </div>
+          <span className="text-gray-700 font-medium">{eff.toFixed(1)}</span>
+        </div>
         
-        {/* Cost (Purple) - Bottom */}
-        <span className="absolute bottom-[18%] left-[50%] -translate-x-1/2 text-white">成本</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2 h-2 rounded-full bg-[#B3C6FF]"></div>
+            <span className="text-gray-600">成本</span>
+          </div>
+          <span className="text-gray-700 font-medium">{cost.toFixed(1)}</span>
+        </div>
         
-        {/* Efficiency (Blue) - Top Left */}
-        <span className="absolute top-[32%] left-[18%] text-white">效率</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1.5">
+            <div className="w-2 h-2 rounded-full bg-[#BFBFBF]"></div>
+            <span className="text-gray-600">体积</span>
+          </div>
+          <span className="text-gray-700 font-medium">{vol.toFixed(1)}</span>
+        </div>
       </div>
     </div>
   );
