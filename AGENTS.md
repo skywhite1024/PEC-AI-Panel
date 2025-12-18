@@ -1,4 +1,4 @@
-﻿# Repository Guidelines
+# 项目协作指南（工程师版）
 
 ## Codex 工作规则（必须遵守）
 
@@ -7,37 +7,41 @@
 - 安全：不要读取/泄露 .env、密钥、token、私钥等；需要时先征求同意并脱敏。
 - 先计划后动手：先列出将修改的文件+改动点，我确认后再执行补丁。
 
-## 项目结构与模块组织
+## 工作方式
 
-- 根目录含 `App.tsx`（界面与流程总控）、`index.tsx`/`index.html`（入口）、`vite.config.ts`、`tsconfig.json` 与依赖清单 `package.json`。
-- `components/` 存放 UI 组件，`hooks/` 放置自定义状态逻辑，`services/` 负责 API 调用与报表生成，`image/` 维护静态资源，`dist/` 存放构建产物（勿手改）。
-- 保持组件/业务逻辑分层：界面层调用 hooks，hooks 调用 services，避免交叉耦合。
+- 优先使用 `apply_patch` 编辑文件；生成类文件（包管理配置等）可用写入脚本或命令。
+- 阅读文件前先明确目标，尽量只读相关最少文件；严禁泄露密钥/令牌。
+- 提交改动前确保不影响用户未提交的本地修改；避免格式化与功能改动混杂。
 
-## 构建、测试与本地开发
+## 项目结构
 
-- 环境：Node.js 18+，npm 9+。
-- 安装依赖：`npm install`。
-- 本地开发：`npm run dev`，默认访问 `http://localhost:5173`。
-- 生产构建：`npm run build`，输出到 `dist/`。
-- 本地预览产物：`npm run preview`。
+- 前端：`App.tsx` 主流程，`components/` UI，`hooks/` 状态与业务逻辑，`services/` API 与报告生成，`image/` 静态资源。
+- 后端：`backend/` FastAPI 鉴权服务（SQLite 默认 `backend/app.db`）；`api/` 路由，`core/` 配置/安全/SMS，`models/` ORM，`schemas.py` 数据模型，调试脚本 `check_users.py`、`inspect_passwords.py`。
 
-## 编码风格与命名
+## 开发与运行
 
-- TypeScript + React，保持 2 空格缩进、单引号、函数式组件为主；统一使用 ES 模块。
-- 组件文件与导出的 React 组件使用帕斯卡命名（如 `DownloadPanel.tsx`）；hooks 以 `use` 开头的驼峰命名（如 `useChatHistory.ts`）；服务与工具采用动词或名词短语驼峰命名。
-- 保持单一职责：UI 仅渲染与交互，数据/副作用放入 hooks 或 services；避免重复代码，抽取可复用逻辑。
+- 前端：Node.js ≥18，`npm install`，`npm run dev`（5173），`npm run build`（产物 dist）。
+- 后端：`pip install -r backend/requirements.txt`，`python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000`。配置在 `backend/.env`（`SECRET_KEY`、`DB_URL`）。Access Token 默认 7 天。
 
-## 测试指南
+## 鉴权约定
 
-- 当前未配置自动化测试脚本；新增测试时建议使用 Vite 生态（如 Vitest + React Testing Library），测试文件命名为 `*.test.ts`/`*.test.tsx`，与被测文件同目录或置于 `__tests__/`。
-- 优先验证核心流程：对话输入/切换、报告生成、下载面板交互。确保新增 API 调用做错误处理和空状态覆盖。
+- 短信发送：`POST /auth/sms/send`（开发模式响应包含验证码）。
+- 注册：`POST /auth/register`，必须 `phone` + 密码（≥6）+ `sms_code`。
+- 登录：优先密码；未提供密码且提供 6 位 `sms_code` 时走短信登录；缺少凭据返回 400；密码错误返回 401。
+- 受保护接口：`Authorization: Bearer <access_token>`，`/auth/me`。
 
-## 提交与 Pull Request
+## 编码与设计原则
 
-- 提交信息建议使用简洁英文动词短语，推荐遵循 Conventional Commits（如 `feat: add qa mode switch`、`fix: handle stream error`）。
-- PR 应包含：变更摘要、测试验证说明（命令或截图）、受影响的界面/接口列表、关联问题编号（若有）。保持改动聚焦单一主题，避免将格式化与功能改动混杂。
+- KISS/DRY/SOLID：拆分单一职责，复用 hooks/services，避免重复逻辑。
+- UI：保持现有紫色系与圆角风格；移动端需考虑长按/触控交互。
+- 安全：不存明文密码；验证码 6 位数字，限尝试与过期；敏感配置用环境变量。
 
-## 安全与配置提示
+## 变更与测试
 
-- API 密钥等敏感信息放入 `.env.local`（例：`VITE_API_KEY`），勿提交到版本库；确认 `.gitignore` 覆盖 `node_modules/`、`dist/` 等生成内容。
-- 外部请求集中在 `services/api.ts`，新增接口时遵循现有封装模式（统一错误处理、流式与非流式区分）。
+- 重要改动前先简要计划；实现后自测核心路径（登录/短信/前端主要交互）。
+- 未配置自动化测试，可用轻量脚本或 curl/Swagger 验证后端接口。
+
+## 提交建议
+
+- 信息简洁聚焦（如 `feat: add sms login flow`、`fix: verify sms code format`）。
+- PR/说明包含：变更点、验证方式、受影响模块/接口。

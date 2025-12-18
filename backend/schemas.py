@@ -3,13 +3,14 @@ from typing import Optional
 
 class UserCreate(BaseModel):
     phone: str = Field(..., min_length=5, max_length=20)
-    password: Optional[str] = Field(default=None, min_length=6, max_length=64)
-    sms_code: Optional[str] = Field(default=None, min_length=4, max_length=6)
+    password: Optional[str] = Field(default=None)
+    # 验证码长度在业务逻辑中校验，允许为空（逻辑层处理）
+    sms_code: Optional[str] = Field(default=None)
 
 class UserLogin(BaseModel):
     phone: str = Field(..., min_length=5, max_length=20)
-    password: Optional[str] = Field(default=None, min_length=6, max_length=64)
-    sms_code: Optional[str] = Field(default=None, min_length=4, max_length=6)
+    password: Optional[str] = Field(default=None)
+    sms_code: Optional[str] = Field(default=None)
 
 class UserOut(BaseModel):
     id: str
@@ -27,3 +28,13 @@ class Token(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class SmsSendRequest(BaseModel):
+    phone: str
+    purpose: str = "login"  # login/register/reset
+
+
+class SmsSendResponse(BaseModel):
+    message: str
+    expires_in_seconds: int = 300
