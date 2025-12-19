@@ -15,6 +15,44 @@ export interface StreamCallbacks {
   onError?: (error: Error) => void;
 }
 
+// Auth 相关类型定义
+
+export interface LoginRequest {
+  phone: string;
+  password?: string;
+  code?: string;
+  type: 'password' | 'code';
+}
+
+export interface RegisterRequest {
+  phone: string;
+  password: string;
+  code: string;
+}
+
+export interface SendCodeRequest {
+  phone: string;
+  type: 'login' | 'register';
+}
+
+export interface AuthResponse {
+  success: boolean;
+  data?: {
+    token: string;
+    user: {
+      id: string;
+      phone: string;
+      name: string;
+    };
+  };
+  message?: string;
+}
+
+export interface CodeResponse {
+  success: boolean;
+  message?: string;
+}
+
 // 魔塔社区 API 配置
 const API_KEY = 'ms-88261760-4c02-4a0d-99ac-635693f9bacf';
 const API_URL = 'https://api-inference.modelscope.cn/v1/chat/completions';
@@ -610,4 +648,64 @@ export function generateInputSuggestion(messages: Message[]): string[] {
   // 默认不返回建议（避免不相关的建议）
   return [];
 }
+
+// Auth 相关 Mock 接口
+export async function login(data: LoginRequest): Promise<AuthResponse> {
+  console.log('Login request:', data);
+  
+  // Mock 实现
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        success: true,
+        data: {
+          token: 'mock-token-' + Date.now(),
+          user: {
+            id: 'user-' + Math.floor(Math.random() * 1000),
+            phone: data.phone,
+            name: '用户' + data.phone.slice(-4)
+          }
+        },
+        message: '登录成功'
+      });
+    }, 500);
+  });
+}
+
+export async function register(data: RegisterRequest): Promise<AuthResponse> {
+  console.log('Register request:', data);
+  
+  // Mock 实现
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        success: true,
+        data: {
+          token: 'mock-token-' + Date.now(),
+          user: {
+            id: 'user-' + Math.floor(Math.random() * 1000),
+            phone: data.phone,
+            name: '用户' + data.phone.slice(-4)
+          }
+        },
+        message: '注册成功'
+      });
+    }, 500);
+  });
+}
+
+export async function sendCode(data: SendCodeRequest): Promise<CodeResponse> {
+  console.log('Send code request:', data);
+  
+  // Mock 实现
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        success: true,
+        message: '验证码发送成功，有效期5分钟'
+      });
+    }, 300);
+  });
+}
+
 console.log('=== api.ts 加载完成 ===');

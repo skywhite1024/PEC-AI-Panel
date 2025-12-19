@@ -11,6 +11,8 @@ import { useDesignContext } from './hooks/useDesignContext';
 import ThinkingBlock from './components/ThinkingBlock';
 import { generateInputSuggestion } from './services/api';
 import { generateInputSuggestionAsync } from './services/api';
+import { AuthModal } from './components/Auth/AuthModal';
+import { useAuth } from './hooks/useAuth';
 
 console.log('App.tsx: 所有 import 完成');
 // 定义当前激活的模块类型
@@ -26,6 +28,7 @@ const App: React.FC = () => {
   const [deleteModalSession, setDeleteModalSession] = useState<{ id: string; title: string } | null>(null);
   const [personaKey, setPersonaKey] = useState<'pv' | 'pe' | 'emc'>('pv');
   const [personaOpen, setPersonaOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -77,6 +80,13 @@ const App: React.FC = () => {
     extractFromMessages,
     clearDesign,
   } = useDesignContext();
+
+  // 使用登录状态 hook
+  const {
+    isLoggedIn,
+    user,
+    logout
+  } = useAuth();
 
   // 添加一个 useEffect 来监听消息变化并生成建议
   useEffect(() => {
@@ -731,15 +741,36 @@ const App: React.FC = () => {
 
           {/* User Footer */}
           <div className="mt-4 pt-4 border-t flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-200 overflow-hidden mr-2 border-2 border-[#5B5FC7]">
-                <img src="https://picsum.photos/32/32" alt="User" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">用户123</span>
-            </div>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <Settings2 size={18} />
-            </button>
+            {isLoggedIn ? (
+              <>
+                <div className="flex items-center">
+                  <div className="w-8 h-8 rounded-full bg-blue-200 overflow-hidden mr-2 border-2 border-[#5B5FC7]">
+                    <img src="https://picsum.photos/32/32" alt="User" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">{user?.name || '用户'}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <Settings2 size={18} />
+                  </button>
+                  <button 
+                    onClick={logout}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="退出登录"
+                  >
+                    <LogIn size={18} className="rotate-180" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="w-full flex items-center justify-center bg-[#E0E7FF] text-[#5B5FC7] px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#d0daff] transition-colors"
+              >
+                <LogIn size={16} className="mr-2" />
+                登录
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -775,9 +806,19 @@ const App: React.FC = () => {
           </div>
 
           <div className="mt-auto pt-6 border-t w-8 flex justify-center">
-            <div className="w-8 h-8 rounded-full bg-blue-200 overflow-hidden border-2 border-[#5B5FC7] cursor-pointer">
-              <img src="https://picsum.photos/32/32" alt="User" />
-            </div>
+            {isLoggedIn ? (
+              <div className="w-8 h-8 rounded-full bg-blue-200 overflow-hidden border-2 border-[#5B5FC7] cursor-pointer">
+                <img src="https://picsum.photos/32/32" alt="User" />
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="w-8 h-8 rounded-full bg-[#E0E7FF] text-[#5B5FC7] flex items-center justify-center hover:bg-[#d0daff] transition-colors"
+                title="登录"
+              >
+                <LogIn size={18} />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1016,6 +1057,12 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 登录/注册弹窗 */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
 
     </div>
   );
