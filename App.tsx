@@ -333,7 +333,7 @@ const App: React.FC = () => {
 
       {/* 官网链接按钮 */}
       <a
-        href="https://glittery-douhua-e39bdd.netlify.app/#"
+        href="https://pecai-website.skywhite1024.dpdns.org/"
         target="_blank"
         rel="noopener noreferrer"
         className="w-full flex items-center px-4 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-[#F0F5FF] hover:text-[#5B5FC7] transition-colors group"
