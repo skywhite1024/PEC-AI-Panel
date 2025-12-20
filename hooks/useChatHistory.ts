@@ -8,6 +8,7 @@ export interface ChatSession {
   messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
+  activeModule: 'input' | 'download' | 'qa';
 }
 
 const STORAGE_KEY = 'pec-ai-chat-history';
@@ -92,6 +93,7 @@ export function useChatHistory() {
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
+      activeModule: 'input',
     };
     
     setSessions(prev => [newSession, ...prev]);
@@ -126,6 +128,22 @@ export function useChatHistory() {
           ...session,
           title,
           messages,
+          updatedAt: new Date(),
+        };
+      }
+      return session;
+    }));
+  }, [currentSessionId]);
+
+  // 更新当前会话的 activeModule
+  const updateActiveModule = useCallback((activeModule: 'input' | 'download' | 'qa') => {
+    if (!currentSessionId) return;
+
+    setSessions(prev => prev.map(session => {
+      if (session.id === currentSessionId) {
+        return {
+          ...session,
+          activeModule,
           updatedAt: new Date(),
         };
       }
@@ -194,6 +212,7 @@ export function useChatHistory() {
     createNewSession,
     switchSession,
     updateMessages,
+    updateActiveModule,
     deleteSession,
     clearAllHistory,
     getGroupedSessions,
