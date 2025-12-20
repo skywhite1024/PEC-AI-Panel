@@ -29,8 +29,23 @@ const App: React.FC = () => {
   const [personaKey, setPersonaKey] = useState<'pv' | 'pe' | 'emc'>('pv');
   const [personaOpen, setPersonaOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  // 分享功能相关状态
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
+  // 输入区功能相关状态
+  const [isRecording, setIsRecording] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isRecognizing, setIsRecognizing] = useState(false);
+  const [recognitionResult, setRecognitionResult] = useState('');
+  const [voiceRecognitionError, setVoiceRecognitionError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggeredRef = useRef(false);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
@@ -47,6 +62,7 @@ const App: React.FC = () => {
     createNewSession,
     switchSession,
     updateMessages,
+    updateActiveModule,
     deleteSession,
     getGroupedSessions,
   } = useChatHistory();
@@ -178,7 +194,6 @@ const App: React.FC = () => {
     resetDesignState();
     clearDesign();
     setDeleteModalSession(null);
-    setActiveModule('input');
     setInputSuggestions([]); // 清空建议
     setShowSuggestions(false);
   }, [switchSession, resetDesignState, clearDesign]);
@@ -371,7 +386,7 @@ const App: React.FC = () => {
     </div>
   );
 
-  // 当切换会话时加载对应的消息
+  // 当切换会话时加载对应的消息和状态
   useEffect(() => {
     if (currentSessionId !== prevSessionIdRef.current) {
       prevSessionIdRef.current = currentSessionId;
@@ -379,8 +394,10 @@ const App: React.FC = () => {
       
       if (currentSession) {
         setMessages(currentSession.messages);
+        setActiveModule(currentSession.activeModule);
       } else {
         setMessages([]);
+        setActiveModule('input');
       }
       
       setTimeout(() => {
@@ -395,6 +412,13 @@ const App: React.FC = () => {
       updateMessages(messages);
     }
   }, [messages, currentSessionId, updateMessages]);
+
+  // 当 activeModule 变化时保存到当前会话
+  useEffect(() => {
+    if (!isSessionSwitchRef.current && currentSessionId) {
+      updateActiveModule(activeModule);
+    }
+  }, [activeModule, currentSessionId, updateActiveModule]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -443,6 +467,193 @@ const App: React.FC = () => {
       longPressTimerRef.current = null;
     }
   }, []);
+
+  // 显示 Toast 提示
+  const showToast = useCallback((message: string) => {
+    setToast({ show: true, message });
+    setTimeout(() => {
+      setToast({ show: false, message: '' });
+    }, 2000);
+  }, []);
+
+  // 复制链接到剪贴板
+  const copyLink = useCallback(() => {
+    const link = `${window.location.origin}?chat=${currentSessionId}`;
+    navigator.clipboard.writeText(link)
+      .then(() => {
+        showToast('链接已复制到剪贴板');
+        setIsShareModalOpen(false);
+      })
+      .catch(err => {
+        console.error('复制失败:', err);
+        showToast('复制失败，请重试');
+      });
+  }, [currentSessionId, showToast]);
+
+  // 生成海报（模拟）
+  const generatePoster = useCallback(() => {
+    showToast('海报生成功能开发中');
+    setIsShareModalOpen(false);
+  }, [showToast]);
+
+  // 文件上传相关
+  const handleFileUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setSelectedFiles(prev => [...prev, ...files]);
+      // 清空文件输入，以便可以重新选择相同的文件
+      e.target.value = '';
+    }
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // 语音输入相关
+  const toggleRecording = useCallback(async () => {
+    // 检查浏览器是否支持语音识别
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('当前浏览器不支持语音识别功能');
+      setVoiceRecognitionError('当前浏览器不支持语音识别功能');
+      return;
+    }
+
+    if (!isRecording && !isRecognizing) {
+      // 从 Idle 状态进入 Listening 状态
+      try {
+        // 请求麦克风权限
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // 开始语音识别
+        recognizeSpeech();
+        
+        setIsRecording(true);
+        setRecordingDuration(0);
+        setVoiceRecognitionError(null);
+        
+        // 开始计时
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration(prev => {
+            const newDuration = prev + 1;
+            // 60秒自动停止录音
+            if (newDuration >= 60) {
+              toggleRecording();
+              return 60;
+            }
+            return newDuration;
+          });
+        }, 1000);
+
+        showToast('正在听...');
+      } catch (error: any) {
+        console.error('语音识别初始化失败:', error);
+        let errorMessage = '录音失败，请检查麦克风权限';
+        if (error.name === 'NotAllowedError') {
+          errorMessage = '麦克风权限被拒绝，请在浏览器设置中允许麦克风访问';
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = '未找到麦克风设备';
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = '麦克风设备不可用';
+        } else if (error.name === 'AbortError') {
+          errorMessage = '录音请求被中止';
+        }
+        showToast(errorMessage);
+        setVoiceRecognitionError(errorMessage);
+      }
+    } else {
+      // 从 Listening 状态进入 Processing 状态，然后回到 Idle
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      
+      // 清除计时
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      
+      showToast('录音已停止');
+    }
+  }, [isRecording, isRecognizing, showToast]);
+
+  // 语音识别功能
+  const recognizeSpeech = useCallback(() => {
+    // 检查浏览器是否支持SpeechRecognition
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('当前浏览器不支持语音识别功能');
+      setIsRecognizing(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      
+      // 配置识别参数
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'zh-CN'; // 设置为中文
+
+      // 识别结果处理 - 实现实时更新
+      recognition.onresult = (event: any) => {
+        // 遍历所有结果，包括临时结果
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          const transcript = result[0].transcript;
+          
+          if (result.isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        // 实时更新输入框，结合最终结果和临时结果
+        const currentTranscript = finalTranscript + interimTranscript;
+        setRecognitionResult(currentTranscript);
+        setInputValue(currentTranscript);
+        
+        // 只在所有结果都完成时才停止识别
+        if (event.results[event.results.length - 1].isFinal) {
+          setIsRecognizing(false);
+          showToast('语音识别完成');
+        }
+      };
+
+      // 识别错误处理
+      recognition.onerror = (event: any) => {
+        console.error('语音识别错误:', event.error);
+        showToast('语音识别失败，请重试');
+        setVoiceRecognitionError('语音识别失败，请重试');
+        setIsRecognizing(false);
+      };
+
+      // 识别结束处理
+      recognition.onend = () => {
+        if (isRecognizing) {
+          setIsRecognizing(false);
+        }
+      };
+
+      // 开始识别
+      recognition.start();
+      setIsRecognizing(true);
+    } catch (error) {
+      console.error('语音识别初始化失败:', error);
+      showToast('语音识别初始化失败');
+      setVoiceRecognitionError('语音识别初始化失败');
+      setIsRecognizing(false);
+    }
+  }, [isRecognizing, showToast]);
 
   const handleSessionPointerDown = useCallback((session: { id: string; title: string }, e: React.PointerEvent) => {
     if (e.pointerType === 'touch') {
@@ -619,7 +830,11 @@ const App: React.FC = () => {
               <ThumbsUp size={16} className="text-gray-400 cursor-pointer hover:text-gray-600" />
               <ThumbsDown size={16} className="text-gray-400 cursor-pointer hover:text-gray-600" />
               <span className="flex-1"></span>
-              <Share2 size={16} className="text-gray-400 cursor-pointer hover:text-gray-600" />
+              <Share2 
+                size={16} 
+                className="text-gray-400 cursor-pointer hover:text-gray-600" 
+                onClick={() => setIsShareModalOpen(true)}
+              />
             </div>
           )}
         </div>
@@ -972,6 +1187,38 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {/* 语音识别错误提示 */}
+          {voiceRecognitionError && (
+            <div className="mb-3 flex items-center bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm">
+              <AlertCircle size={14} className="mr-2" />
+              <span>{voiceRecognitionError}</span>
+              <button 
+                onClick={() => setVoiceRecognitionError(null)}
+                className="ml-auto text-red-500 hover:text-red-700"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* 选中的文件预览 */}
+          {selectedFiles.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center bg-gray-100 rounded-full px-3 py-1.5 text-sm">
+                  <FileEdit size={14} className="text-gray-500 mr-2" />
+                  <span className="text-gray-700 truncate max-w-[150px]">{file.name}</span>
+                  <button 
+                    onClick={() => removeFile(index)}
+                    className="ml-2 text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="border border-[#5B5FC7]/30 rounded-2xl p-2 md:p-3 bg-white shadow-sm flex flex-col relative focus-within:ring-1 focus-within:ring-[#5B5FC7]/20 transition-all">
             <textarea 
               ref={textareaRef}
@@ -996,16 +1243,55 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex items-center space-x-2 md:space-x-3">
-                <Paperclip size={18} className="text-gray-400 hover:text-gray-600 cursor-pointer" />
-                <Mic size={18} className="text-gray-400 hover:text-gray-600 cursor-pointer" />
+                {/* 文件上传按钮 */}
+                <button 
+                  onClick={handleFileUploadClick}
+                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
+                  disabled={isLoading}
+                >
+                  <Paperclip size={18} />
+                </button>
+                {/* 隐藏的文件选择器 */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={isLoading}
+                />
+                
+                {/* 语音输入按钮 */}
+                <div className="relative">
+                  <button 
+                    onClick={toggleRecording}
+                    className={`cursor-pointer transition-all ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-gray-600'}`}
+                    disabled={isLoading}
+                    title={isRecording ? '停止录音' : '开始录音'}
+                  >
+                    <Mic size={18} />
+                  </button>
+                  
+                  {/* 录音时长显示 */}
+                  {isRecording && (
+                    <div className="absolute -top-6 -right-8 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full min-w-[40px] text-center">
+                      {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                    </div>
+                  )}
+                  
+                  {/* 识别状态提示 */}
+                  {isRecognizing && (
+                    <div className="absolute -top-6 -right-12 bg-[#5B5FC7] text-white text-xs px-2 py-0.5 rounded-full">
+                      识别中...
+                    </div>
+                  )}
+                </div>
+                
+                {/* 发送按钮 */}
                 <button 
                   onClick={handleSend}
                   disabled={isLoading || !inputValue.trim()}
-                  className={`p-1.5 rounded-full transition-colors shadow-sm ${
-                    isLoading || !inputValue.trim()
-                      ? 'bg-gray-300 cursor-not-allowed'
-                      : 'bg-[#5B5FC7] hover:bg-[#4a4ea3] text-white'
-                  }`}
+                  className={`p-1.5 rounded-full transition-colors shadow-sm ${isLoading || !inputValue.trim() ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#5B5FC7] hover:bg-[#4a4ea3] text-white'}`}
                 >
                   <ArrowUp size={18} />
                 </button>
@@ -1063,6 +1349,50 @@ const App: React.FC = () => {
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
       />
+
+      {/* 分享 Modal */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E9FF] max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">分享对话</h3>
+            <div className="space-y-3">
+              <button
+                onClick={copyLink}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 hover:bg-[#F0F5FF] transition-colors group"
+              >
+                <div className="flex items-center">
+                  <Copy size={18} className="text-gray-500 mr-3 group-hover:text-[#5B5FC7] transition-colors" />
+                  <span className="text-sm font-medium text-gray-700">复制链接</span>
+                </div>
+                <ArrowRightCircle size={16} className="text-gray-400 group-hover:text-[#5B5FC7] transition-colors" />
+              </button>
+              <button
+                onClick={generatePoster}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 hover:bg-[#F0F5FF] transition-colors group"
+              >
+                <div className="flex items-center">
+                  <FileEdit size={18} className="text-gray-500 mr-3 group-hover:text-[#5B5FC7] transition-colors" />
+                  <span className="text-sm font-medium text-gray-700">生成海报</span>
+                </div>
+                <ArrowRightCircle size={16} className="text-gray-400 group-hover:text-[#5B5FC7] transition-colors" />
+              </button>
+            </div>
+            <button
+              onClick={() => setIsShareModalOpen(false)}
+              className="w-full mt-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors font-medium text-sm"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast 提示 */}
+      {toast.show && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#5B5FC7] text-white px-4 py-2 rounded-full shadow-lg">
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
 
     </div>
   );
