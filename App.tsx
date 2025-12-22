@@ -1306,7 +1306,7 @@ const App: React.FC = () => {
       {isProMode && (
         <div className="
           fixed md:relative inset-0 md:inset-auto
-          w-full md:w-[55%] md:min-w-[500px] 
+          w-full md:w-[60%] md:min-w-[500px] 
           h-full 
           bg-white md:bg-transparent
           border-l-0 md:border-l border-gray-200 

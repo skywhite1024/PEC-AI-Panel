@@ -540,7 +540,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              专家调参
+              算法导出
             </button>
           </div>
         </div>
@@ -814,7 +814,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({
           /* 设计方案内容 */
           <DesignPanel onLockAndContinue={() => {}} />
         ) : activeTab === 'expert' ? (
-          /* 专家调参内容 */
+          /* 算法导出内容 */
           <ExpertTuningPanel />
         ) : (
           /* 实时计算内容 */
