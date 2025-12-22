@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { ArrowLeftCircle, X, ChevronRight, Lock, Check, Pause, Square } from 'lucide-react';
 import { PecLogoIcon, ProInput, ProRangeInput, CustomPieChart } from './PanelComponents';
+import ExpertTuningPanel from './ExpertTuningPanel';
 
 // 拓扑选择选项
 type TopologyType = 'buck' | 'boost' | 'buck-boost';
@@ -366,7 +367,7 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({
   onPause,
   onStop,
 }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'design' | 'calc'>('design');
+  const [activeTab, setActiveTab] = useState<'params' | 'design' | 'calc' | 'expert'>('design');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -530,6 +531,16 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({
               }`}
             >
               实时计算
+            </button>
+            <button
+              onClick={() => setActiveTab('expert')}
+              className={`px-3 md:px-5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                activeTab === 'expert' 
+                  ? 'bg-white text-[#2F54EB] shadow-sm' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              专家调参
             </button>
           </div>
         </div>
@@ -802,6 +813,9 @@ const ProfessionalPanel: React.FC<ProfessionalPanelProps> = ({
         ) : activeTab === 'design' ? (
           /* 设计方案内容 */
           <DesignPanel onLockAndContinue={() => {}} />
+        ) : activeTab === 'expert' ? (
+          /* 专家调参内容 */
+          <ExpertTuningPanel />
         ) : (
           /* 实时计算内容 */
           <div className="space-y-4">
