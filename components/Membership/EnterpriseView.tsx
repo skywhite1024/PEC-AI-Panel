@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import ProjectDesignService from './ProjectDesignService';
 import PlatformSubscription from './PlatformSubscription';
 import ProductCustomization from './ProductCustomization';
 
-const EnterpriseView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'design' | 'subscription' | 'customization'>('design');
+interface EnterpriseViewProps {
+  billingCycle: 'monthly' | 'yearly';
+  activeTab: 'design' | 'subscription' | 'customization';
+  onTabChange: (tab: 'design' | 'subscription' | 'customization') => void;
+}
+
+const EnterpriseView: React.FC<EnterpriseViewProps> = ({ billingCycle, activeTab, onTabChange }) => {
 
   const tabs = [
     { id: 'design', label: '项目设计服务' },
@@ -30,7 +35,7 @@ const EnterpriseView: React.FC = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => onTabChange(tab.id as any)}
             className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === tab.id
                 ? 'bg-blue-600 text-white shadow-lg'
@@ -45,7 +50,7 @@ const EnterpriseView: React.FC = () => {
       {/* Tab Content */}
       <div className="w-full">
         {activeTab === 'design' && <ProjectDesignService />}
-        {activeTab === 'subscription' && <PlatformSubscription />}
+        {activeTab === 'subscription' && <PlatformSubscription billingCycle={billingCycle} />}
         {activeTab === 'customization' && <ProductCustomization />}
       </div>
     </div>

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { Check, Star } from 'lucide-react';
+import React from 'react';
+import { Star, MessageSquareText, Zap, Calculator, BarChart3, Database, History, Infinity, Cpu } from 'lucide-react';
 import { handlePaymentIntent } from './utils';
 
-const IndividualView: React.FC = () => {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+interface IndividualViewProps {
+  billingCycle: 'monthly' | 'yearly';
+}
+
+const IndividualView: React.FC<IndividualViewProps> = ({ billingCycle }) => {
 
   const plans = [
     {
@@ -12,10 +15,10 @@ const IndividualView: React.FC = () => {
       description: '面向初学者、在校学生等',
       price: 0,
       features: [
-        '基于自然语言的基础设计交互',
-        '主流电力电子变换器拓扑推荐',
-        '关键参数的自动计算与初步匹配',
-        '标准示例案例与结果可视化展示'
+        { text: '基于自然语言的基础设计交互', icon: MessageSquareText },
+        { text: '主流电力电子变换器拓扑推荐', icon: Zap },
+        { text: '关键参数的自动计算与初步匹配', icon: Calculator },
+        { text: '标准示例案例与结果可视化展示', icon: BarChart3 }
       ],
       buttonText: '您当前的套餐',
       isCurrent: true
@@ -27,10 +30,10 @@ const IndividualView: React.FC = () => {
       price: billingCycle === 'monthly' ? 129 : 1290,
       period: billingCycle === 'monthly' ? '/月' : '/年',
       features: [
-        '自由数据库导入',
-        '历史方案保存与管理',
-        '不限额的调用次数使用限制',
-        '不限额的算力额度使用限制'
+        { text: '自由数据库导入', icon: Database },
+        { text: '历史方案保存与管理', icon: History },
+        { text: '不限额的调用次数使用限制', icon: Infinity },
+        { text: '不限额的算力额度使用限制', icon: Cpu }
       ],
       buttonText: '立即订阅',
       recommended: true,
@@ -42,17 +45,8 @@ const IndividualView: React.FC = () => {
     <div className="w-full flex flex-col items-center animate-in fade-in duration-500">
       <h2 className="text-3xl font-bold text-white mb-8">个人用户方案</h2>
       
-      {/* Toggle */}
-      <div className="flex items-center space-x-3 mb-12">
-        <span className={`text-sm ${billingCycle === 'monthly' ? 'text-white font-medium' : 'text-gray-400'}`}>每月</span>
-        <button 
-          onClick={() => setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly')}
-          className="w-14 h-7 bg-blue-900/50 rounded-full border border-blue-500/30 relative flex items-center transition-colors"
-        >
-          <div className={`w-5 h-5 bg-blue-400 rounded-full shadow-md absolute transition-transform duration-300 ${billingCycle === 'monthly' ? 'left-1' : 'translate-x-7 left-1'}`}></div>
-        </button>
-        <span className={`text-sm ${billingCycle === 'yearly' ? 'text-white font-medium' : 'text-gray-400'}`}>每年</span>
-      </div>
+      {/* Toggle Removed - Moved to Parent */}
+
 
       {/* Cards */}
       <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
@@ -91,9 +85,9 @@ const IndividualView: React.FC = () => {
               {plan.features.map((feature, idx) => (
                 <li key={idx} className="flex items-start text-sm text-gray-300">
                   <div className="mt-0.5 mr-3 p-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                    <Check size={12} strokeWidth={3} />
+                    <feature.icon size={12} strokeWidth={3} />
                   </div>
-                  {feature}
+                  {feature.text}
                 </li>
               ))}
             </ul>
