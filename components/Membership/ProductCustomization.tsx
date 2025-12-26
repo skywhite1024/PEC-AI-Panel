@@ -1,5 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Layers, Zap, Truck, ShoppingCart } from 'lucide-react';
+import { 
+  ShoppingCart, Rocket, Beaker, Headphones, 
+  TrendingUp, PiggyBank, CalendarCheck, 
+  Coins, Factory, Globe, Handshake 
+} from 'lucide-react';
 import { handlePaymentIntent } from './utils';
 
 const ProductCustomization: React.FC = () => {
@@ -42,24 +46,34 @@ const ProductCustomization: React.FC = () => {
       name: '小批量 (<200台)',
       desc: '按台计价',
       formulaDisplay: '成本价*1.1+200',
-      features: ['快速交付', '适合原型验证', '标准支持服务'],
-      icon: Layers
+      features: [
+        { text: '快速交付', icon: Rocket },
+        { text: '适合原型验证', icon: Beaker },
+        { text: '标准支持服务', icon: Headphones }
+      ]
     },
     {
       id: 'medium',
       name: '中批量 (200-2000台)',
       desc: '单价下调',
       formulaDisplay: '成本价*1.07+100',
-      features: ['效率优化', '降低启动成本', '优先排程'],
-      icon: Zap
+      features: [
+        { text: '效率优化', icon: TrendingUp },
+        { text: '降低启动成本', icon: PiggyBank },
+        { text: '优先排程', icon: CalendarCheck }
+      ]
     },
     {
       id: 'large',
       name: '大批量 (>2000台)',
       desc: '封顶价',
       formulaDisplay: '成本价*1.02',
-      features: ['最大化成本节约', '专属生产线', '全球物流集成', '战略合作协议'],
-      icon: Truck
+      features: [
+        { text: '最大化成本节约', icon: Coins },
+        { text: '专属生产线', icon: Factory },
+        { text: '全球物流集成', icon: Globe },
+        { text: '战略合作协议', icon: Handshake }
+      ]
     }
   ];
 
@@ -97,8 +111,8 @@ const ProductCustomization: React.FC = () => {
               <ul className="space-y-3">
                 {batch.features.map((feat, idx) => (
                   <li key={idx} className="flex items-center text-sm text-gray-300">
-                    <batch.icon size={14} className="mr-2 text-blue-400" />
-                    {feat}
+                    <feat.icon size={14} className="mr-2 text-blue-400" />
+                    {feat.text}
                   </li>
                 ))}
               </ul>

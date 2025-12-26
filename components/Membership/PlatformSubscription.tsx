@@ -1,8 +1,21 @@
 import React from 'react';
-import { Check, Star, Crown } from 'lucide-react';
+import { 
+  Check, Star, Crown, ToggleLeft, Zap, Calculator, Database, 
+  Target, Microchip, LineChart, FileUp, TrendingUp, 
+  Network, ShieldAlert, CheckCircle2, Library, Infinity, 
+  Factory, Briefcase, Server, Sparkles 
+} from 'lucide-react';
 import { handlePaymentIntent } from './utils';
 
-const PlatformSubscription: React.FC = () => {
+interface PlatformSubscriptionProps {
+  billingCycle: 'monthly' | 'yearly';
+}
+
+const PlatformSubscription: React.FC<PlatformSubscriptionProps> = ({ billingCycle }) => {
+  const calculatePrice = (price: number) => {
+    return billingCycle === 'yearly' ? price * 12 * 0.8 : price;
+  };
+
   const plans = [
     {
       id: 'basic',
@@ -10,10 +23,10 @@ const PlatformSubscription: React.FC = () => {
       desc: '基础设计级',
       price: 5000,
       features: [
-        '普通专业双模式开放',
-        '主流变换器拓扑选择',
-        '基础参数自动计算',
-        '公共数据库访问'
+        { text: '普通专业双模式开放', icon: ToggleLeft },
+        { text: '主流变换器拓扑选择', icon: Zap },
+        { text: '基础参数自动计算', icon: Calculator },
+        { text: '公共数据库访问', icon: Database }
       ]
     },
     {
@@ -23,11 +36,11 @@ const PlatformSubscription: React.FC = () => {
       price: 25000,
       recommended: true,
       features: [
-        '多目标优化 (效率/成本/体积等)',
-        '器件精细选型与参数敏感性分析',
-        '优化过程可视化与结果对比',
-        '仿真模型导出 (用于二次验证)',
-        '更高调用上限'
+        { text: '多目标优化 (效率/成本/体积等)', icon: Target },
+        { text: '器件精细选型与参数敏感性分析', icon: Microchip },
+        { text: '优化过程可视化与结果对比', icon: LineChart },
+        { text: '仿真模型导出 (用于二次验证)', icon: FileUp },
+        { text: '更高调用上限', icon: TrendingUp }
       ]
     },
     {
@@ -36,11 +49,11 @@ const PlatformSubscription: React.FC = () => {
       desc: '系统级设计级',
       price: 50000,
       features: [
-        '系统级多目标协同优化',
-        '复杂工程约束',
-        '高精度仿真与设计一致性校验',
-        '私有设计库管理',
-        '不限制调用配额'
+        { text: '系统级多目标协同优化', icon: Network },
+        { text: '复杂工程约束', icon: ShieldAlert },
+        { text: '高精度仿真与设计一致性校验', icon: CheckCircle2 },
+        { text: '私有设计库管理', icon: Library },
+        { text: '不限制调用配额', icon: Infinity }
       ]
     },
     {
@@ -50,11 +63,11 @@ const PlatformSubscription: React.FC = () => {
       price: 80000,
       isSupreme: true,
       features: [
-        '与制造环节深度对接',
-        '全功能无限制使用',
-        '行业/企业专属模型定制',
-        '私有数据本地或私有云部署',
-        '专属优化策略与参数模板'
+        { text: '与制造环节深度对接', icon: Factory },
+        { text: '全功能无限制使用', icon: Crown },
+        { text: '行业/企业专属模型定制', icon: Briefcase },
+        { text: '私有数据本地或私有云部署', icon: Server },
+        { text: '专属优化策略与参数模板', icon: Sparkles }
       ]
     }
   ];
@@ -93,8 +106,10 @@ const PlatformSubscription: React.FC = () => {
 
           <div className="mb-6">
             <span className="text-sm text-gray-400">¥</span>
-            <span className={`text-3xl font-bold mx-1 ${plan.isSupreme ? 'text-yellow-200' : 'text-white'}`}>{plan.price.toLocaleString()}</span>
-            <span className="text-xs text-gray-500">/月</span>
+            <span className={`text-3xl font-bold mx-1 ${plan.isSupreme ? 'text-yellow-200' : 'text-white'}`}>
+              {calculatePrice(plan.price).toLocaleString()}
+            </span>
+            <span className="text-xs text-gray-500">{billingCycle === 'monthly' ? '/月' : '/年'}</span>
           </div>
 
           {/* Divider */}
@@ -104,15 +119,15 @@ const PlatformSubscription: React.FC = () => {
             {plan.features.map((feature, idx) => (
               <li key={idx} className="flex items-start text-xs text-gray-300 leading-relaxed">
                 <div className={`mt-0.5 mr-2 p-0.5 rounded-full shrink-0 ${plan.isSupreme ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                  <Check size={10} strokeWidth={3} />
+                  <feature.icon size={10} strokeWidth={3} />
                 </div>
-                {feature}
+                {feature.text}
               </li>
             ))}
           </ul>
 
           <button
-            onClick={() => handlePaymentIntent('subscription', plan.price, { planId: plan.id })}
+            onClick={() => handlePaymentIntent('subscription', calculatePrice(plan.price), { planId: plan.id, cycle: billingCycle })}
             className={`w-full py-2.5 rounded-full text-sm font-bold transition-all hover:shadow-lg hover:scale-[1.02] ${
               plan.isSupreme
                 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-black hover:shadow-yellow-500/40'
