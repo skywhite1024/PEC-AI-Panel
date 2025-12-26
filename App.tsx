@@ -2,8 +2,9 @@
 console.log('=== App.tsx 模块开始加载 ===');
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, Paperclip, Mic, ArrowUp, Settings2, RotateCcw, ThumbsUp, ThumbsDown, Share2, Copy, FileEdit, CirclePlus, ChevronDown, LogIn, Download, MessageSquare, ArrowRightCircle, History, Menu, X, AlertCircle, Trash2, CheckCircle } from 'lucide-react';
+import { Bot, Paperclip, Mic, ArrowUp, Settings2, RotateCcw, ThumbsUp, ThumbsDown, Share2, Copy, FileEdit, CirclePlus, ChevronDown, LogIn, Download, MessageSquare, ArrowRightCircle, History, Menu, X, AlertCircle, Trash2, CheckCircle, Crown } from 'lucide-react';
 import ProfessionalPanel from './components/ProfessionalPanel';
+import MembershipPage from './components/Membership/MembershipPage';
 import { useChat, ChatMessage } from './hooks/useChat';
 import { useChatHistory } from './hooks/useChatHistory';
 import DownloadPanel from './components/DownloadPanel';
@@ -20,6 +21,7 @@ type ActiveModule = 'input' | 'download' | 'qa';
 
 const App: React.FC = () => {
   const [isProMode, setIsProMode] = useState(false);
+  const [showMembership, setShowMembership] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
@@ -911,6 +913,14 @@ const App: React.FC = () => {
           </div>
 
           <button 
+            onClick={() => setShowMembership(true)}
+            className="w-full flex items-center justify-center px-4 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg hover:scale-[1.02] mb-3 transition-all group"
+          >
+            <Crown size={18} className="mr-2 text-yellow-300 group-hover:animate-pulse" /> 
+            <span className="font-bold text-sm">会员与商业服务</span>
+          </button>
+
+          <button 
             onClick={handleNewChat}
             className="flex items-center justify-center w-full py-2.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 mb-6 shadow-sm font-medium text-sm transition-colors"
           >
@@ -997,6 +1007,14 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex flex-col space-y-6 flex-1 w-full items-center">
+            <button 
+              onClick={() => setShowMembership(true)}
+              className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg hover:scale-110 transition-all"
+              title="会员与商业服务"
+            >
+              <Crown size={20} className="text-yellow-300" />
+            </button>
+
             <button className="text-gray-400 hover:text-[#5B5FC7] transition-colors" title="历史记录">
               <History size={20} />
             </button>
@@ -1393,6 +1411,9 @@ const App: React.FC = () => {
           <span className="text-sm font-medium">{toast.message}</span>
         </div>
       )}
+
+      {/* Membership Page Overlay */}
+      {showMembership && <MembershipPage onClose={() => setShowMembership(false)} />}
 
     </div>
   );
