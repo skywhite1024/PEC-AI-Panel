@@ -14,10 +14,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const { login, register, isLoading, error: authError, clearError } = useAuth();
 
@@ -57,6 +58,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setPhone('');
     setPassword('');
     setCode('');
+    setInviteCode('');
     setCountdown(0);
     setErrors({});
     setActiveTab('login');
@@ -103,11 +105,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       } else if (!/^\d{6}$/.test(code)) {
         newErrors.code = '请输入6位数字验证码';
       }
+
+      if (!inviteCode.trim()) {
+        newErrors.inviteCode = '请输入内测邀请码';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [activeTab, phone, password, code, loginType]);
+  }, [activeTab, phone, password, code, inviteCode, loginType]);
 
   // 发送验证码
   const handleSendCode = useCallback(async () => {
@@ -169,14 +175,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       await register({
         phone,
         password,
-        code
+        code,
+        inviteCode: inviteCode.trim()
       });
       setToast({ message: '注册成功', type: 'success' });
       onClose();
     } catch (error) {
       // 错误已由 useAuth 处理
     }
-  }, [phone, password, code, validateForm, register, onClose]);
+  }, [phone, password, code, inviteCode, validateForm, register, onClose]);
 
   // 处理忘记密码
   const handleForgotPassword = useCallback(() => {
@@ -414,6 +421,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               </div>
               {errors.code && (
                 <p className="text-xs text-red-500 mt-1">{errors.code}</p>
+              )}
+            </div>
+
+            {/* 邀请码输入 */}
+            <div className="mb-6">
+              <label htmlFor="register-invite-code" className="block text-sm font-medium text-gray-700 mb-1">
+                内测邀请码
+              </label>
+              <input
+                type="text"
+                id="register-invite-code"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="请输入内测邀请码"
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#5B5FC7]/20 focus:border-[#5B5FC7] transition-all ${errors.inviteCode 
+                  ? 'border-red-500' 
+                  : 'border-[#E5E9FF]'}`}
+              />
+              {errors.inviteCode && (
+                <p className="text-xs text-red-500 mt-1">{errors.inviteCode}</p>
               )}
             </div>
 

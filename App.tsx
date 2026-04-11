@@ -14,6 +14,7 @@ import { generateInputSuggestion } from './services/api';
 import { generateInputSuggestionAsync } from './services/api';
 import { AuthModal } from './components/Auth/AuthModal';
 import { useAuth } from './hooks/useAuth';
+import { OPEN_AUTH_MODAL_EVENT } from './components/Membership/utils';
 
 console.log('App.tsx: 所有 import 完成');
 // 定义当前激活的模块类型
@@ -105,6 +106,18 @@ const App: React.FC = () => {
     user,
     logout
   } = useAuth();
+
+  useEffect(() => {
+    const handleOpenAuthModal = () => {
+      setShowMembership(false);
+      setIsAuthModalOpen(true);
+    };
+
+    window.addEventListener(OPEN_AUTH_MODAL_EVENT, handleOpenAuthModal);
+    return () => {
+      window.removeEventListener(OPEN_AUTH_MODAL_EVENT, handleOpenAuthModal);
+    };
+  }, []);
 
   // 添加一个 useEffect 来监听消息变化并生成建议
   useEffect(() => {
@@ -445,6 +458,10 @@ const App: React.FC = () => {
     }
   }, [messages, hasValidDesign, extractFromMessages]);
 
+  const handleOpenMembership = useCallback(() => {
+    setShowMembership(true);
+  }, []);
+
   // 删除对话 - 弹窗确认
   const handleAskDeleteSession = useCallback((session: { id: string; title: string }, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -494,7 +511,7 @@ const App: React.FC = () => {
 
   // 生成海报（模拟）
   const generatePoster = useCallback(() => {
-    showToast('海报生成功能开发中');
+    showToast('海报功能入口已开放，请先复制链接进行分享');
     setIsShareModalOpen(false);
   }, [showToast]);
 
@@ -913,7 +930,7 @@ const App: React.FC = () => {
           </div>
 
           <button 
-            onClick={() => setShowMembership(true)}
+            onClick={handleOpenMembership}
             className="w-full flex items-center justify-center px-4 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg hover:scale-[1.02] mb-3 transition-all group"
           >
             <Crown size={18} className="mr-2 text-yellow-300 group-hover:animate-pulse" /> 
@@ -1008,7 +1025,7 @@ const App: React.FC = () => {
 
           <div className="flex flex-col space-y-6 flex-1 w-full items-center">
             <button 
-              onClick={() => setShowMembership(true)}
+              onClick={handleOpenMembership}
               className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg hover:scale-110 transition-all"
               title="会员与商业服务"
             >

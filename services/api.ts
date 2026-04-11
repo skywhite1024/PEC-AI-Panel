@@ -28,6 +28,7 @@ export interface RegisterRequest {
   phone: string;
   password: string;
   code: string;
+  inviteCode: string;
 }
 
 export interface SendCodeRequest {
@@ -674,6 +675,23 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
 
 export async function register(data: RegisterRequest): Promise<AuthResponse> {
   console.log('Register request:', data);
+
+  const normalizedInviteCode = (data.inviteCode || '').trim();
+  const expectedInviteCode = import.meta.env.VITE_BETA_INVITE_CODE || 'PEC-AI-BETA';
+
+  if (!normalizedInviteCode) {
+    return {
+      success: false,
+      message: '请输入内测邀请码'
+    };
+  }
+
+  if (normalizedInviteCode !== expectedInviteCode) {
+    return {
+      success: false,
+      message: '内测邀请码无效'
+    };
+  }
   
   // Mock 实现
   return new Promise((resolve) => {

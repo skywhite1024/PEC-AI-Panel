@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { login, register, LoginRequest, RegisterRequest, AuthResponse } from '../services/api';
 
+const AUTH_STATE_CHANGED_EVENT = 'pec-auth-state-changed';
+
 interface User {
   id: string;
   phone: string;
@@ -26,41 +28,65 @@ export const useAuth = () => {
   });
 
   // 从 localStorage 加载登录状态
-  useEffect(() => {
-    const loadAuthState = () => {
-      try {
-        const savedToken = localStorage.getItem('auth_token');
-        const savedUser = localStorage.getItem('auth_user');
-        
-        if (savedToken && savedUser) {
-          setAuthState({
-            isLoggedIn: true,
-            user: JSON.parse(savedUser),
-            token: savedToken,
-            isLoading: false,
-            error: null
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load auth state:', error);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
+  const readAuthStateFromStorage = useCallback((): AuthState => {
+    try {
+      const savedToken = localStorage.getItem('auth_token');
+      const savedUser = localStorage.getItem('auth_user');
+
+      if (savedToken && savedUser) {
+        return {
+          isLoggedIn: true,
+          user: JSON.parse(savedUser),
+          token: savedToken,
+          isLoading: false,
+          error: null
+        };
       }
+    } catch (error) {
+      console.error('Failed to load auth state:', error);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+    }
+
+    return {
+      isLoggedIn: false,
+      user: null,
+      token: null,
+      isLoading: false,
+      error: null
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      setAuthState((prev) => ({
+        ...readAuthStateFromStorage(),
+        error: prev.error
+      }));
     };
 
-    loadAuthState();
-  }, []);
+    syncAuthState();
+    window.addEventListener('storage', syncAuthState);
+    window.addEventListener(AUTH_STATE_CHANGED_EVENT, syncAuthState as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', syncAuthState);
+      window.removeEventListener(AUTH_STATE_CHANGED_EVENT, syncAuthState as EventListener);
+    };
+  }, [readAuthStateFromStorage]);
 
   // 保存登录状态到 localStorage
   const saveAuthState = useCallback((token: string, user: User) => {
     localStorage.setItem('auth_token', token);
     localStorage.setItem('auth_user', JSON.stringify(user));
+    window.dispatchEvent(new Event(AUTH_STATE_CHANGED_EVENT));
   }, []);
 
   // 清除登录状态
   const clearAuthState = useCallback(() => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    window.dispatchEvent(new Event(AUTH_STATE_CHANGED_EVENT));
   }, []);
 
   // 登录

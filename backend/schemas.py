@@ -6,6 +6,7 @@ class UserCreate(BaseModel):
     password: Optional[str] = Field(default=None)
     # 验证码长度在业务逻辑中校验，允许为空（逻辑层处理）
     sms_code: Optional[str] = Field(default=None)
+    invite_code: Optional[str] = Field(default=None)
 
 class UserLogin(BaseModel):
     phone: str = Field(..., min_length=5, max_length=20)

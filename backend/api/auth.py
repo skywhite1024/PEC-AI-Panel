@@ -14,6 +14,7 @@ from ..core.security import (
     create_access_refresh_tokens,
     decode_refresh_token,
 )
+from ..core.config import settings
 from ..core.sms import save_code, verify_code, DEFAULT_EXPIRE_MINUTES, MAX_ATTEMPTS
 from ..deps import get_db, get_current_user
 
@@ -29,9 +30,13 @@ def register(payload: schemas.UserCreate, db: Session = Depends(get_db)):
     # 需同时提供密码与短信验证码
     pwd = (payload.password or "").strip() or None
     sms = (payload.sms_code or "").strip() or None
+    invite = (payload.invite_code or "").strip() or None
 
-    if not pwd or not sms:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password and sms_code required")
+    if not pwd or not sms or not invite:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password, sms_code and invite_code required")
+
+    if invite != settings.beta_invite_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid invite code")
 
     if pwd and len(pwd) < 6:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password too short (min 6 chars)")
