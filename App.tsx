@@ -1280,19 +1280,19 @@ const App: React.FC = () => {
             
             <div className="flex items-center justify-between">
               <div className="hidden sm:flex items-center space-x-3">
+                <span className="text-xs font-medium text-gray-500">深度思考</span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={isDeepThinkingEnabled}
-                  aria-label="Toggle deep thinking"
+                  aria-label="深度思考开关"
                   onClick={() => setIsDeepThinkingEnabled(prev => !prev)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full overflow-hidden text-transparent transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                     isDeepThinkingEnabled
                       ? 'bg-[#5B5FC7]'
                       : 'bg-gray-300'
                   }`}
                 >
-                  <Settings2 size={12} className="mr-1" /> 深度思考
                   <span
                     className={`absolute left-0 inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
                       isDeepThinkingEnabled ? 'translate-x-5' : 'translate-x-1'

@@ -248,6 +248,38 @@ function normalizeSuggestionText(text: string): string {
     .trim();
 }
 
+function extractSuggestionQuestionFocus(text: string): string {
+  const plainText = cleanMarkdown(text)
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+  if (!plainText) return '';
+
+  const lines = plainText
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const questionCuePattern = /[？?]|请问|是否|有无|多少|多大|多高|多宽|哪种|哪个|什么|怎么|如何|需不需要|要不要|能否|可否|请确认|确认一下|还需要|还想|还要|请告诉我|告诉我|补充/;
+  const questionLines = lines.filter(line => questionCuePattern.test(line));
+
+  if (questionLines.length > 0) {
+    return normalizeSuggestionText(questionLines.slice(-2).join(' '));
+  }
+
+  const sentenceParts = plainText
+    .split(/(?<=[。；;！？?!])/)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  const questionParts = sentenceParts.filter(part => questionCuePattern.test(part));
+  if (questionParts.length > 0) {
+    return normalizeSuggestionText(questionParts.slice(-2).join(' '));
+  }
+
+  return normalizeSuggestionText(plainText);
+}
+
 function shouldGenerateInputSuggestions(text: string): boolean {
   const normalized = normalizeSuggestionText(text);
   if (!normalized) return false;
@@ -272,8 +304,9 @@ export async function generateInputSuggestionAsync(messages: Message[]): Promise
   
   const lastMessage = messages[messages.length - 1];
   if (lastMessage.role !== 'assistant') return [];
-  
-  if (!shouldGenerateInputSuggestions(lastMessage.content)) {
+
+  const questionFocus = extractSuggestionQuestionFocus(lastMessage.content);
+  if (!shouldGenerateInputSuggestions(questionFocus)) {
     return [];
   }
   
@@ -282,7 +315,7 @@ export async function generateInputSuggestionAsync(messages: Message[]): Promise
       model: MODEL,
       messages: [
         { role: 'system', content: SUGGESTION_PROMPT },
-        { role: 'user', content: `AI助手的回复：\n${lastMessage.content}\n\n请生成3个用户可能的回答建议：` }
+        { role: 'user', content: `AI助手当前想确认的问题：\n${questionFocus}\n\n请生成3个用户可能的回答建议：` }
       ],
       temperature: 0.7,
       max_tokens: SUGGESTION_MAX_TOKENS,
@@ -723,39 +756,44 @@ export function generateInputSuggestion(messages: Message[]): string[] {
   if (lastMessage.role !== 'assistant') return [];
   
   const content = normalizeSuggestionText(lastMessage.content);
-  if (!shouldGenerateInputSuggestions(content)) return [];
+  const questionFocus = extractSuggestionQuestionFocus(lastMessage.content) || content;
+  if (!shouldGenerateInputSuggestions(questionFocus)) return [];
 
-  const contentLower = content.toLowerCase();
+  const contentLower = questionFocus.toLowerCase();
   const suggestions: string[] = [];
 
-  if (/(交流|直流|ac|dc|输出类型|220v.*直流|220v.*交流)/i.test(content)) {
+  if (/(交流|直流|ac|dc|输出类型|220v.*直流|220v.*交流)/i.test(questionFocus)) {
     return uniqueSuggestions(['220V 交流输出', '220V 直流输出', '需要输入输出隔离']);
   }
 
-  if (/(输入电压范围|电池.*范围|最低.*电压|最高.*电压|voltage range|min|max)/i.test(content)) {
+  if (/(输入电压范围|电池.*范围|最低.*电压|最高.*电压|voltage range|min|max)/i.test(questionFocus)) {
     return uniqueSuggestions(['输入范围 40V-54V', '输入范围 36V-60V', '输入电压 48V']);
   }
 
-  if (/(隔离|isolation|电气隔离)/i.test(content)) {
+  if (/(隔离|isolation|电气隔离)/i.test(questionFocus)) {
     return uniqueSuggestions(['需要输入输出隔离', '不需要隔离', '希望提高安全性']);
   }
   
   // 获取所有历史对话内容，用于判断哪些信息已经收集了
-  const allContent = messages.map(m => m.content).join(' ').toLowerCase();
+  const allContent = messages.map(m => normalizeSuggestionText(m.content)).join(' ').toLowerCase();
   
   // 检查是否已经确认了某些参数
   const hasVoltage = /\d+\s*[vV]/.test(allContent);
   const hasPower = /\d+\s*[wW瓦]/.test(allContent);
   const hasTopology = /boost|buck|升压|降压/.test(allContent);
+  const isBoostContext = /boost|升压/.test(allContent);
   
   // ========== 精确匹配 AI 的具体提问 ==========
   
   // AI 询问功率 - 最高优先级匹配
-  if (contentLower.includes('功率是多少') || 
+  if (!contentLower.includes('输出电压') &&
+      !contentLower.includes('需要输出多少伏') &&
+      !contentLower.includes('输入电压') &&
+      (contentLower.includes('功率是多少') || 
       contentLower.includes('输出功率') && contentLower.includes('？') ||
       contentLower.includes('功率需求') ||
       contentLower.includes('多少瓦') ||
-      contentLower.includes('功率等级')) {
+      contentLower.includes('功率等级'))) {
     suggestions.push('输出功率 500W');
     suggestions.push('1kW');
     suggestions.push('200W');
@@ -776,9 +814,22 @@ export function generateInputSuggestion(messages: Message[]): string[] {
   if ((contentLower.includes('输出电压') && contentLower.includes('？')) ||
       contentLower.includes('输出电压是多少') ||
       contentLower.includes('需要输出多少伏')) {
-    suggestions.push('输出电压 100V');
-    suggestions.push('输出 48V');
-    suggestions.push('输出电压 400V');
+    const voltageExamples = Array.from(questionFocus.matchAll(/(\d+(?:\.\d+)?)\s*[vV]/g))
+      .map(match => `输出电压 ${match[1]}V`);
+
+    if (voltageExamples.length > 0) {
+      return uniqueSuggestions(voltageExamples);
+    }
+
+    if (isBoostContext) {
+      suggestions.push('输出电压 80V');
+      suggestions.push('输出电压 120V');
+      suggestions.push('输出电压 220V');
+    } else {
+      suggestions.push('输出电压 12V');
+      suggestions.push('输出电压 48V');
+      suggestions.push('输出电压 220V');
+    }
     return suggestions.slice(0, 3);
   }
   
