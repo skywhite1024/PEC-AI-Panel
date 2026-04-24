@@ -58,6 +58,8 @@ export interface CodeResponse {
 const API_KEY = 'ms-88261760-4c02-4a0d-99ac-635693f9bacf';
 const API_URL = 'https://api-inference.modelscope.cn/v1/chat/completions';
 const MODEL = 'Qwen/Qwen3.5-35B-A3B';
+const CHAT_MAX_TOKENS = 2400;
+const SUGGESTION_MAX_TOKENS = 120;
 // const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
 
 // 设计引导系统提示词（信息输入模式）
@@ -245,7 +247,7 @@ export async function generateInputSuggestionAsync(messages: Message[]): Promise
         { role: 'user', content: `AI助手的回复：\n${lastMessage.content}\n\n请生成3个用户可能的回答建议：` }
       ],
       temperature: 0.7,
-      max_tokens: 200,
+      max_tokens: SUGGESTION_MAX_TOKENS,
     };
 
     const response = await fetch(API_URL, {
@@ -291,6 +293,123 @@ function cleanMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, '$1')
     .replace(/```[\s\S]*?```/g, '')
     .trim();
+}
+
+function dedupeThinkingLine(lines: string[], line?: string) {
+  if (!line || lines.includes(line)) return;
+  lines.push(line);
+}
+
+function sanitizeThinkingFact(value: string): string {
+  return value
+    .replace(/\(.*?\)/g, '')
+    .replace(/\bfrom previous turn\b/gi, '')
+    .replace(/\bcurrent stage\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.。,:：;；]+$/g, '')
+    .trim();
+}
+
+function matchThinkingFact(text: string, patterns: RegExp[]): string | undefined {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      const value = sanitizeThinkingFact(match[1]);
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+function fallbackThinkingLines(text: string): string[] {
+  return cleanMarkdown(text)
+    .split('\n')
+    .map(line => line.replace(/^\s*(\d+\.|[-*])\s*/g, '').trim())
+    .filter(line => line.length > 0)
+    .filter(line => !/^(thinking process|analyze|determine|draft|refin|wait|self-correction|constraint|final check)/i.test(line))
+    .slice(0, 3);
+}
+
+function formatThinkingForDisplay(rawThinking: string): string {
+  const normalized = rawThinking.replace(/\r/g, '\n').replace(/\u0000/g, '').trim();
+  if (!normalized) return '';
+
+  const summaryLines: string[] = [];
+  const facts: string[] = [];
+
+  const inputVoltage = matchThinkingFact(normalized, [
+    /input(?: voltage)?\s*[:：]\s*([^\n]+)/i,
+    /输入电压\s*[:：]\s*([^\n]+)/,
+  ]);
+  if (inputVoltage && /\d/.test(inputVoltage)) {
+    facts.push(`输入${inputVoltage}`);
+  }
+
+  const outputVoltage = matchThinkingFact(normalized, [
+    /output(?: voltage)?\s*[:：]\s*([^\n]+)/i,
+    /输出电压\s*[:：]\s*([^\n]+)/,
+  ]);
+  if (outputVoltage && /\d/.test(outputVoltage)) {
+    facts.push(`输出${outputVoltage}`);
+  }
+
+  const outputPower = matchThinkingFact(normalized, [
+    /power requirement\s*[:：]\s*([^\n]+)/i,
+    /output power\s*[:：]\s*([^\n]+)/i,
+    /功率(?:需求|要求)?\s*[:：]\s*([^\n]+)/,
+  ]);
+  if (outputPower && /\d/.test(outputPower)) {
+    facts.push(`功率${outputPower}`);
+  }
+
+  if (facts.length > 0) {
+    dedupeThinkingLine(summaryLines, `已识别条件：${facts.join('，')}`);
+  }
+
+  if (/(analyze the user input|analyze the input|基础信息收集|识别用户输入|梳理输入条件)/i.test(normalized)) {
+    dedupeThinkingLine(summaryLines, '正在梳理你已提供的设计条件');
+  }
+
+  if (/(topology|boost|buck|buck-boost|llc|full-bridge|flyback|interleaved|isolated|non-isolated|拓扑|隔离型|非隔离)/i.test(normalized)) {
+    dedupeThinkingLine(summaryLines, '正在判断更合适的拓扑方向');
+  }
+
+  if (/(missing info|need to confirm|still need|clarify|question 1|question 2|待确认|补充信息|确认参数)/i.test(normalized)) {
+    dedupeThinkingLine(summaryLines, '正在补充仍需确认的关键参数');
+  }
+
+  if (/(draft(?:ing)? the response|formulate a response|draft response|组织回复|生成回复)/i.test(normalized)) {
+    dedupeThinkingLine(summaryLines, '正在组织最终回复内容');
+  }
+
+  if (/(refin(?:e|ing)|final check|constraint check|self-correction|final polish|最终检查|优化表达)/i.test(normalized)) {
+    dedupeThinkingLine(summaryLines, '正在检查表达是否清晰、完整');
+  }
+
+  const nextSteps: string[] = [];
+  if (/(input voltage range|battery voltage range|voltage range|min\/max|minimum|maximum|输入电压范围|最高电压|最低电压)/i.test(normalized)) {
+    nextSteps.push('输入电压范围');
+  }
+  if (/(isolation|isolated|non-isolated|electrical isolation|隔离需求|是否需要隔离)/i.test(normalized)) {
+    nextSteps.push('是否需要隔离');
+  }
+  if (/(ac output|dc output|ac or dc|inverter|输出类型|交流还是直流|逆变)/i.test(normalized)) {
+    nextSteps.push('输出类型');
+  }
+  if (nextSteps.length > 0) {
+    dedupeThinkingLine(summaryLines, `下一步会确认${nextSteps.join('、')}`);
+  }
+
+  if (summaryLines.length > 0) {
+    return summaryLines.slice(0, 4).join('\n');
+  }
+
+  const fallbackLines = fallbackThinkingLines(normalized);
+  if (fallbackLines.length > 0) {
+    return fallbackLines.join('\n');
+  }
+
+  return '正在整理设计条件并准备回复';
 }
 
 // 检查 AI 回复是否在询问生成方案
@@ -350,7 +469,7 @@ export async function sendMessageStream(
     ],
     stream: true,
     temperature: 0.7,
-    max_tokens: 8000,
+    max_tokens: CHAT_MAX_TOKENS,
   };
 
   try {
@@ -398,7 +517,7 @@ export async function sendMessageStream(
             if (delta) {
               if (delta.reasoning_content) {
                 thinkingContent += delta.reasoning_content;
-                callbacks.onThinking?.(thinkingContent);
+                callbacks.onThinking?.(formatThinkingForDisplay(thinkingContent));
               }
               
               if (delta.content) {
@@ -439,7 +558,7 @@ export async function sendMessage(
       ...messages
     ],
     temperature: 0.7,
-    max_tokens: 8000,
+    max_tokens: CHAT_MAX_TOKENS,
   };
 
   try {

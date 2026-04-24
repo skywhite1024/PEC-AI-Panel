@@ -94,7 +94,6 @@ export function useChat() {
     params: {}
   });
   const [currentThinking, setCurrentThinking] = useState<string>('');
-  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   const [chatMode, setChatMode] = useState<ChatMode>('design');
 
   const generateId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -127,7 +126,7 @@ export function useChat() {
     const newMessages = [...messages, userMessage, assistantMessage];
     setMessages(newMessages);
     setIsLoading(true);
-    setThinkingStartTime(Date.now());
+    const requestStartedAt = Date.now();
 
     // 检查用户是否要求生成方案（在 AI 询问之后）
     const userWantsGeneration = designState.isAskingForGeneration && checkUserWantsGeneration(content);
@@ -160,9 +159,7 @@ export function useChat() {
         },
         onContent: (contentText) => {
           finalContent = contentText;
-          const thinkingDuration = thinkingStartTime 
-            ? Math.round((Date.now() - thinkingStartTime) / 1000)
-            : undefined;
+          const thinkingDuration = Math.max(1, Math.round((Date.now() - requestStartedAt) / 1000));
           
           setMessages(prev => prev.map(msg => 
             msg.id === assistantMessageId 
@@ -171,9 +168,7 @@ export function useChat() {
           ));
         },
         onDone: () => {
-          const thinkingDuration = thinkingStartTime 
-            ? Math.round((Date.now() - thinkingStartTime) / 1000)
-            : undefined;
+          const thinkingDuration = Math.max(1, Math.round((Date.now() - requestStartedAt) / 1000));
           
           setMessages(prev => prev.map(msg => 
             msg.id === assistantMessageId 
@@ -181,7 +176,6 @@ export function useChat() {
               : msg
           ));
           setIsLoading(false);
-          setThinkingStartTime(null);
           
           // 只在设计模式下检查确认状态
           if (chatMode === 'design') {
@@ -210,15 +204,13 @@ export function useChat() {
           setError(err.message);
           setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
           setIsLoading(false);
-          setThinkingStartTime(null);
         }
       }, chatMode, designContext);
     } catch (err) {
       setError(err instanceof Error ? err.message : '发送消息失败');
       setIsLoading(false);
-      setThinkingStartTime(null);
     }
-  }, [messages, isLoading, thinkingStartTime, designState.isAskingForGeneration, chatMode]);
+  }, [messages, isLoading, designState.isAskingForGeneration, chatMode]);
 
   // 清空对话
   const clear = useCallback(() => {

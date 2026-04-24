@@ -125,13 +125,20 @@ const App: React.FC = () => {
       if (messages.length > 0 && !isLoading) {
         const lastMessage = messages[messages.length - 1];
         if (lastMessage.role === 'assistant' && !lastMessage.isStreaming) {
-          setIsSuggestionsLoading(true);  // 开始加载
-          
           const apiMessages = messages.map(m => ({
             role: m.role as 'user' | 'assistant',
             content: m.content
           }));
+          const localSuggestions = generateInputSuggestion(apiMessages);
+          if (localSuggestions.length > 0) {
+            setInputSuggestions(localSuggestions);
+            setShowSuggestions(true);
+            setIsSuggestionsLoading(false);
+            return;
+          }
           
+          setIsSuggestionsLoading(true);
+
           const suggestions = await generateInputSuggestionAsync(apiMessages);
           setInputSuggestions(suggestions);
           setShowSuggestions(suggestions.length > 0);
