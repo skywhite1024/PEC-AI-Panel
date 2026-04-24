@@ -242,14 +242,38 @@ const SUGGESTION_PROMPT = `你是一个对话建议生成器。根据AI助手的
 3. 如果AI没有明确提问，返回空`;
 
 // 通过 AI 生成输入建议（异步）
+function normalizeSuggestionText(text: string): string {
+  return cleanMarkdown(text)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function shouldGenerateInputSuggestions(text: string): boolean {
+  const normalized = normalizeSuggestionText(text);
+  if (!normalized) return false;
+
+  const hasQuestionMark = /[？?]/.test(normalized);
+  const hasQuestionCue = /(请问|是否|有无|有没有|多少|多大|多高|多宽|哪种|哪个|什么|怎么|如何|需不需要|要不要|能否|可否|请确认|确认一下|还需要|还想|还要|是否需要|请告诉我)/.test(normalized);
+  const reportLikeReply = /(损耗分析|热设计|热管理|预计总效率|设计报告|物料清单|BOM|推荐型号|系统规格|测试方法|PCB|导通损耗|开关损耗|变压器损耗)/.test(normalized);
+
+  if (reportLikeReply && !hasQuestionMark && !hasQuestionCue) {
+    return false;
+  }
+
+  return hasQuestionMark || hasQuestionCue;
+}
+
+function uniqueSuggestions(suggestions: string[]): string[] {
+  return Array.from(new Set(suggestions.map(item => item.trim()).filter(Boolean))).slice(0, 3);
+}
+
 export async function generateInputSuggestionAsync(messages: Message[]): Promise<string[]> {
   if (messages.length === 0) return [];
   
   const lastMessage = messages[messages.length - 1];
   if (lastMessage.role !== 'assistant') return [];
   
-  // 检查AI回复中是否有问号，如果没有问号可能不需要建议
-  if (!lastMessage.content.includes('？') && !lastMessage.content.includes('?')) {
+  if (!shouldGenerateInputSuggestions(lastMessage.content)) {
     return [];
   }
   
@@ -698,9 +722,23 @@ export function generateInputSuggestion(messages: Message[]): string[] {
   const lastMessage = messages[messages.length - 1];
   if (lastMessage.role !== 'assistant') return [];
   
-  const content = lastMessage.content;
+  const content = normalizeSuggestionText(lastMessage.content);
+  if (!shouldGenerateInputSuggestions(content)) return [];
+
   const contentLower = content.toLowerCase();
   const suggestions: string[] = [];
+
+  if (/(交流|直流|ac|dc|输出类型|220v.*直流|220v.*交流)/i.test(content)) {
+    return uniqueSuggestions(['220V 交流输出', '220V 直流输出', '需要输入输出隔离']);
+  }
+
+  if (/(输入电压范围|电池.*范围|最低.*电压|最高.*电压|voltage range|min|max)/i.test(content)) {
+    return uniqueSuggestions(['输入范围 40V-54V', '输入范围 36V-60V', '输入电压 48V']);
+  }
+
+  if (/(隔离|isolation|电气隔离)/i.test(content)) {
+    return uniqueSuggestions(['需要输入输出隔离', '不需要隔离', '希望提高安全性']);
+  }
   
   // 获取所有历史对话内容，用于判断哪些信息已经收集了
   const allContent = messages.map(m => m.content).join(' ').toLowerCase();

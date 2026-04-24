@@ -1279,20 +1279,28 @@ const App: React.FC = () => {
             ></textarea>
             
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+              <div className="hidden sm:flex items-center space-x-3">
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isDeepThinkingEnabled}
+                  aria-label="Toggle deep thinking"
                   onClick={() => setIsDeepThinkingEnabled(prev => !prev)}
-                  title={isDeepThinkingEnabled ? 'Deep thinking enabled' : 'Fast reply mode'}
-                  className={`hidden sm:flex items-center px-2 md:px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full overflow-hidden text-transparent transition-colors ${
                     isDeepThinkingEnabled
-                      ? 'bg-[#5B5FC7] text-white hover:bg-[#4a4ea3]'
-                      : 'text-[#5B5FC7] bg-[#E0E7FF] hover:bg-[#d0daff]'
+                      ? 'bg-[#5B5FC7]'
+                      : 'bg-gray-300'
                   }`}
                 >
                   <Settings2 size={12} className="mr-1" /> 深度思考
+                  <span
+                    className={`absolute left-0 inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      isDeepThinkingEnabled ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
                 </button>
-                <span className="hidden sm:inline text-xs text-gray-400">
-                  {isDeepThinkingEnabled ? 'Deep mode' : 'Fast mode'}
+                <span className="text-xs text-gray-400">
+                  {isDeepThinkingEnabled ? 'ON' : 'OFF'}
                 </span>
               </div>
               
