@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
   const [inputSuggestions, setInputSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isDeepThinkingEnabled, setIsDeepThinkingEnabled] = useState(false);
   const [deleteModalSession, setDeleteModalSession] = useState<{ id: string; title: string } | null>(null);
   const [personaKey, setPersonaKey] = useState<'pv' | 'pe' | 'emc'>('pv');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -277,7 +278,7 @@ const App: React.FC = () => {
               <button
                 onClick={() => {
                   resetDesignState();
-                  send('我想继续调整一些参数');
+                  send('我想继续调整一些参数', undefined, isDeepThinkingEnabled);
                 }}
                 className="flex items-center px-4 py-2 border border-[#5B5FC7] text-[#5B5FC7] rounded-lg text-sm font-medium hover:bg-[#F0F5FF] transition-colors"
               >
@@ -719,7 +720,7 @@ const App: React.FC = () => {
     setInputValue('');
     setInputSuggestions([]); // 清空建议
     setShowSuggestions(false);
-    await send(message);
+    await send(message, undefined, isDeepThinkingEnabled);
   };
 
   // 键盘事件
@@ -1279,9 +1280,20 @@ const App: React.FC = () => {
             
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <button className="hidden sm:flex items-center text-[#5B5FC7] bg-[#E0E7FF] px-2 md:px-3 py-1 rounded-full text-xs font-medium hover:bg-[#d0daff] transition-colors">
+                <button
+                  onClick={() => setIsDeepThinkingEnabled(prev => !prev)}
+                  title={isDeepThinkingEnabled ? 'Deep thinking enabled' : 'Fast reply mode'}
+                  className={`hidden sm:flex items-center px-2 md:px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    isDeepThinkingEnabled
+                      ? 'bg-[#5B5FC7] text-white hover:bg-[#4a4ea3]'
+                      : 'text-[#5B5FC7] bg-[#E0E7FF] hover:bg-[#d0daff]'
+                  }`}
+                >
                   <Settings2 size={12} className="mr-1" /> 深度思考
                 </button>
+                <span className="hidden sm:inline text-xs text-gray-400">
+                  {isDeepThinkingEnabled ? 'Deep mode' : 'Fast mode'}
+                </span>
               </div>
               
               <div className="flex items-center space-x-2 md:space-x-3">

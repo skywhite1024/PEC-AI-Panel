@@ -15,6 +15,10 @@ export interface StreamCallbacks {
   onError?: (error: Error) => void;
 }
 
+export interface ChatRequestOptions {
+  enableThinking?: boolean;
+}
+
 // Auth 相关类型定义
 
 export interface LoginRequest {
@@ -58,9 +62,19 @@ export interface CodeResponse {
 const API_KEY = 'ms-88261760-4c02-4a0d-99ac-635693f9bacf';
 const API_URL = 'https://api-inference.modelscope.cn/v1/chat/completions';
 const MODEL = 'Qwen/Qwen3.5-35B-A3B';
-const CHAT_MAX_TOKENS = 2400;
 const SUGGESTION_MAX_TOKENS = 120;
+const FAST_DESIGN_MAX_TOKENS = 900;
+const FAST_QA_MAX_TOKENS = 1400;
+const THINKING_DESIGN_MAX_TOKENS = 1800;
+const THINKING_QA_MAX_TOKENS = 2200;
+const DESIGN_HISTORY_WINDOW = 6;
+const QA_HISTORY_WINDOW = 8;
+let chatThinkingEnabled = false;
 // const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
+
+export function setChatThinkingEnabled(enabled: boolean) {
+  chatThinkingEnabled = enabled;
+}
 
 // 设计引导系统提示词（信息输入模式）
 const DESIGN_GUIDE_PROMPT = `你是 PEC-AI，一个专业的电力电子变换器设计助手。你的任务是通过友好的多轮对话，引导用户完善设计需求。
@@ -412,6 +426,93 @@ function formatThinkingForDisplay(rawThinking: string): string {
   return '正在整理设计条件并准备回复';
 }
 
+function truncateText(text: string, maxLength: number): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function collectSpecSummary(text: string): string[] {
+  const specs: string[] = [];
+  const normalized = text.replace(/\s+/g, ' ');
+
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*[Vv]\s*[-~至到]\s*(\d+(?:\.\d+)?)\s*[Vv]/);
+  if (rangeMatch) {
+    specs.push(`输入范围 ${rangeMatch[1]}V-${rangeMatch[2]}V`);
+  }
+
+  const voltageMatches = Array.from(normalized.matchAll(/(\d+(?:\.\d+)?)\s*[Vv]/g)).map(match => `${match[1]}V`);
+  if (voltageMatches.length >= 2 && !specs.some(item => item.includes('输入范围'))) {
+    specs.push(`关键电压 ${Array.from(new Set(voltageMatches)).slice(0, 3).join(' / ')}`);
+  }
+
+  const powerMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(k?[Ww])/);
+  if (powerMatch) {
+    specs.push(`功率 ${powerMatch[1]}${powerMatch[2]}`);
+  }
+
+  const topologyMatch = normalized.match(/(Boost|Buck-Boost|Buck|LLC|Full-Bridge|Flyback|Push-Pull|Interleaved)/i);
+  if (topologyMatch) {
+    specs.push(`拓扑 ${topologyMatch[1]}`);
+  }
+
+  const priorityMatch = normalized.match(/(效率优先|成本优先|体积优先|均衡设计|efficiency|cost|volume|balanced)/i);
+  if (priorityMatch) {
+    specs.push(`偏好 ${priorityMatch[1]}`);
+  }
+
+  return Array.from(new Set(specs)).slice(0, 4);
+}
+
+function buildConversationSummary(messages: Message[], mode: ChatMode): string {
+  const userMessages = messages.filter(message => message.role === 'user').map(message => truncateText(message.content, 80));
+  const allText = messages.map(message => message.content).join(' ');
+  const specs = collectSpecSummary(allText);
+  const summaryLines = ['以下为更早对话的压缩摘要，仅用于保持上下文连续：'];
+
+  if (userMessages.length > 0) {
+    summaryLines.push(`最初诉求：${userMessages[0]}`);
+  }
+
+  if (specs.length > 0) {
+    summaryLines.push(`已知条件：${specs.join('；')}`);
+  }
+
+  if (userMessages.length > 1) {
+    summaryLines.push(`近期补充：${userMessages.slice(-2).join('；')}`);
+  }
+
+  if (mode === 'qa') {
+    summaryLines.push('当前阶段：设计方案已生成，用户正在围绕现有方案继续追问。');
+  }
+
+  return summaryLines.join('\n');
+}
+
+function compactConversationMessages(messages: Message[], mode: ChatMode): Message[] {
+  const historyWindow = mode === 'design' ? DESIGN_HISTORY_WINDOW : QA_HISTORY_WINDOW;
+  if (messages.length <= historyWindow) {
+    return messages;
+  }
+
+  const olderMessages = messages.slice(0, -historyWindow);
+  const recentMessages = messages.slice(-historyWindow);
+  const summary = buildConversationSummary(olderMessages, mode);
+
+  return [
+    { role: 'system', content: summary },
+    ...recentMessages,
+  ];
+}
+
+function getChatMaxTokens(mode: ChatMode, enableThinking: boolean): number {
+  if (enableThinking) {
+    return mode === 'design' ? THINKING_DESIGN_MAX_TOKENS : THINKING_QA_MAX_TOKENS;
+  }
+
+  return mode === 'design' ? FAST_DESIGN_MAX_TOKENS : FAST_QA_MAX_TOKENS;
+}
+
 // 检查 AI 回复是否在询问生成方案
 export function checkAskingForGeneration(aiResponse: string): boolean {
   const askKeywords = [
@@ -461,15 +562,17 @@ export async function sendMessageStream(
     systemPrompt = systemPrompt + `\n\n【当前设计方案详情】\n${designContext}`;
   }
   
+  const requestMessages = compactConversationMessages(messages, mode);
   const requestBody = {
     model: MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
-      ...messages
+      ...requestMessages
     ],
     stream: true,
     temperature: 0.7,
-    max_tokens: CHAT_MAX_TOKENS,
+    max_tokens: getChatMaxTokens(mode, chatThinkingEnabled),
+    enable_thinking: chatThinkingEnabled,
   };
 
   try {
@@ -551,14 +654,16 @@ export async function sendMessage(
   
   const systemPrompt = mode === 'design' ? DESIGN_GUIDE_PROMPT : QA_MODE_PROMPT;
   
+  const requestMessages = compactConversationMessages(messages, mode);
   const requestBody = {
     model: MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
-      ...messages
+      ...requestMessages
     ],
     temperature: 0.7,
-    max_tokens: CHAT_MAX_TOKENS,
+    max_tokens: getChatMaxTokens(mode, chatThinkingEnabled),
+    enable_thinking: chatThinkingEnabled,
   };
 
   try {

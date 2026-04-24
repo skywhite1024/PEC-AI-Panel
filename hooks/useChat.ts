@@ -6,7 +6,8 @@ import {
   checkDesignConfirmation, 
   checkUserWantsGeneration,
   checkAskingForGeneration,
-  ChatMode 
+  ChatMode,
+  setChatThinkingEnabled
 } from '../services/api';
 
 export interface ChatMessage {
@@ -99,11 +100,12 @@ export function useChat() {
   const generateId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // 流式发送消息
-  const send = useCallback(async (content: string, designContext?: string) => {
+  const send = useCallback(async (content: string, designContext?: string, enableThinking = false) => {
     if (!content.trim() || isLoading) return;
 
     setError(null);
     setCurrentThinking('');
+    setChatThinkingEnabled(enableThinking);
     
     const userMessage: ChatMessage = {
       id: generateId(),
@@ -120,7 +122,7 @@ export function useChat() {
       thinking: '',
       timestamp: new Date(),
       isStreaming: true,
-      isThinking: true,
+      isThinking: enableThinking,
     };
     
     const newMessages = [...messages, userMessage, assistantMessage];
